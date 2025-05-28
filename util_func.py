@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+import pickle
+
 
 matplotlib.use('TkAgg')  # or 'Agg', 'Qt5Agg', etc. depending on your setup
 
@@ -168,3 +170,46 @@ def compute_poly(L, q, a):
         signal_out = signal_out + a[i_idx] * L_q
         L_q = np.matmul(L, L_q)
     return signal_out
+
+
+
+##  saving and editing functions
+def update_performance_vs_time_data(orig_file_name, new_data_file_name, file_name_to_save):
+    # Load
+    with open(orig_file_name, "rb") as f:
+        orig_data = pickle.load(f)
+
+    # Load
+    with open(new_data_file_name, "rb") as f:
+        new_data = pickle.load(f)
+
+
+        merged_dict_list = []
+        for i in range(len(new_data)):
+            new_dict = dict()
+            new_dict.update(orig_data[i])
+            new_dict.update(new_data[i])
+            merged_dict_list.append(new_dict)
+        with open(file_name_to_save, "wb") as f:
+            pickle.dump(merged_dict_list, f)
+        return merged_dict_list
+
+
+def update_performance_vs_parameter_data(orig_file_name, new_data_file_name, file_name_to_save):
+    with open(orig_file_name, "rb") as f:
+        orig_data = pickle.load(f)
+    # orig_data = orig_data[1:]
+    with open(new_data_file_name, "rb") as f:
+        new_data = pickle.load(f)
+    merged_dict_list = []
+    for parameter_val in range(len(new_data)):
+        new_dict_list1 = []
+        for iter_idx in range(len(new_data[parameter_val])):
+            new_dict = dict()
+            new_dict.update(orig_data[parameter_val][iter_idx])
+            new_dict.update(new_data[parameter_val][iter_idx])
+            new_dict_list1.append(new_dict)
+        merged_dict_list.append(new_dict_list1)
+    with open(file_name_to_save, "wb") as f:
+        pickle.dump(merged_dict_list, f)
+    return merged_dict_list

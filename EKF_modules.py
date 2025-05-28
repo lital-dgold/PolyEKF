@@ -18,6 +18,7 @@ from scipy.linalg import cholesky
 from scipy.optimize import nnls
 from util_func import *
 from change_detection_module import ChangeDetectionMethod
+import traceback
 np.random.seed(0)
 
 MSE_FULL = 'mse_full'
@@ -341,7 +342,7 @@ class KalmanFilt(nn.Module):
 
         # Calculate the Kalman Gain
         # K = Sigma * H'* inv(H*Sigma*H'+W)
-        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S+1e-7))
+        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S))
         self.s = (self.s + np.dot(K, (y - np.dot(H, self.s))))
         I = np.eye(H.shape[1])
         self.Sigma = np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K,
@@ -352,6 +353,7 @@ class KalmanFilt(nn.Module):
         self.predict()
         # Then use observation to refine update
         self.update(q, y)
+        self.s = np.maximum(self.s, 0)
         return self.s
 
 
@@ -368,7 +370,7 @@ class ExtendedKalmanFilter(KalmanFilt):
 
         # Calculate the Kalman Gain
         # K = Sigma * H'* inv(H*Sigma*H'+W)
-        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S+1e-7))
+        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S))
         self.s = (self.s + np.dot(K, (y - compute_poly(L, q, self.a))))
         I = np.eye(H.shape[1])
         self.Sigma = np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K,
@@ -388,7 +390,7 @@ class FastExtendedKalmanFilter(KalmanFilt):
 
         # Calculate the Kalman Gain
         # K = Sigma * H'* inv(H*Sigma*H'+W)
-        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S+1e-7))
+        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S + np.dot(1e-5, np.eye(S.shape[0]))))
         self.s = (self.s + np.dot(K, (y - compute_poly(L, q, self.a))))
         I = np.eye(H.shape[1])
         self.Sigma = np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K,
@@ -407,7 +409,7 @@ class sparseKalmanFilter(FastExtendedKalmanFilter):
         return self.s
 
 
-class sparseKalmanFilterISTA(ExtendedKalmanFilter):
+class sparseKalmanFilterISTA(FastExtendedKalmanFilter):
     def __init__(self, F, B, C_u, C_w, C_x, StateInit, poly_c, lambda_1):
         super(sparseKalmanFilterISTA, self).__init__(F, B, C_u, C_w, C_x, StateInit, poly_c)
         self.lambda_1 = lambda_1
@@ -415,7 +417,7 @@ class sparseKalmanFilterISTA(ExtendedKalmanFilter):
     def update(self, q, y):
         L = build_L(self.B, self.s)
         Delta_Y_t = y - compute_poly(L, q, self.a)
-        H = compute_Jacobian_poly_dp(L, self.B, q, self.a)
+        H = compute_Jacobian_poly_dp(L, self.B, q, self.a, self.edges)
         # Optimization variable
         x = cp.Variable((self.B.shape[1], 1), nonneg=True)
         # Objective function
@@ -425,23 +427,33 @@ class sparseKalmanFilterISTA(ExtendedKalmanFilter):
         from scipy.linalg import sqrtm
         W_sqrt_inv = np.linalg.inv(sqrtm(self.W))
         Sigma_sqrt_inv = np.linalg.inv(sqrtm(self.Sigma))
+        beta = self.lambda_1
+        max_attempts = 10
 
-        objective = cp.Minimize(
-            cp.sum_squares(W_sqrt_inv @ (Delta_Y_t - H @ (x - self.s))) +
-            cp.sum_squares(Sigma_sqrt_inv @ (x - self.s)) +
-            self.lambda_1 * cp.norm1(x)
-        )
+        for i in range(max_attempts):
+            try:
+                objective = cp.Minimize(
+                    cp.sum_squares(W_sqrt_inv @ (Delta_Y_t - H @ (x - self.s))) +
+                    cp.sum_squares(Sigma_sqrt_inv @ (x - self.s)) +
+                    beta * cp.norm1(x)
+                )
 
-        # Problem definition and solving
-        problem = cp.Problem(objective)
-        problem.solve()
+                # Define and solve the problem
+                problem = cp.Problem(objective)
+                problem.solve()
+                break  # Exit loop if solve was successful
+
+            except cp.error.SolverError:
+                beta *= 2  # Increase regularization if solver fails
+                if i == max_attempts - 1:
+                    raise RuntimeError("Optimization failed after multiple attempts.")
 
         # Solution
         self.s = x.value
         S = np.dot(H, np.dot(self.Sigma, H.T)) + self.W
 
         # Calculate the Kalman Gain
-        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S+1e-7))
+        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S))
         I = np.eye(H.shape[1])
         self.Sigma = (
                 np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K, np.dot(self.W, K.T)))
@@ -494,7 +506,21 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
         # Concatenate H and the identity matrix vertically
         S = np.dot(H, np.dot(self.Sigma[np.ix_(connections, connections)], H.T)) + self.W
         # Calculate the Kalman Gain
-        K = np.dot(np.dot(self.Sigma[np.ix_(connections, connections)], H.T), np.linalg.inv(S+1e-6))
+        try:
+            K = np.dot(
+                np.dot(self.Sigma[np.ix_(connections, connections)], H.T),
+                np.linalg.inv(S +  + np.dot(1e-5, np.eye(S.shape[0])))
+            )
+        except np.linalg.LinAlgError as e:
+            print("Caught a singular matrix error in EKF update step.")
+            print("Matrix S shape:", S.shape)
+            print("Matrix S rank:", np.linalg.matrix_rank(S))
+            print("Matrix S:\n", S)
+            print("Connections:", connections)
+            print("H.T shape:", H.T.shape)
+            print("Sigma block shape:", self.Sigma[np.ix_(connections, connections)].shape)
+            traceback.print_exc()  # full traceback for debugging
+            raise  # Re-raise if you want the program to crash after logging        self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
         self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
         I = np.eye(H.shape[1])
         Sigma_small = np.dot(np.dot((I - np.dot(K, H)), self.Sigma[np.ix_(connections, connections)]),
@@ -508,6 +534,7 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
         disconnections = np.setdiff1d(np.arange(self.s.shape[0]), updated_connections)
         self.s[disconnections] = 0
         self.update(q, y, updated_connections)
+        self.s = np.maximum(self.s, 0)
         return self.s
 
 
@@ -524,7 +551,7 @@ class oraclKalmanFilt_paper_delayed(ExtendedKalmanFilter):
         # Concatenate H and the identity matrix vertically
         S = np.dot(H, np.dot(self.Sigma[np.ix_(connections, connections)], H.T)) + self.W
         # Calculate the Kalman Gain
-        K = np.dot(np.dot(self.Sigma[np.ix_(connections, connections)], H.T), np.linalg.inv(S+1e-7))
+        K = np.dot(np.dot(self.Sigma[np.ix_(connections, connections)], H.T), np.linalg.inv(S))
         I = np.eye(H.shape[1])
         Sigma_small = np.dot(np.dot((I - np.dot(K, H)), self.Sigma[np.ix_(connections, connections)]),
                              (I - np.dot(K, H)).T) + np.dot(K, np.dot(self.W, K.T))
@@ -602,7 +629,7 @@ class SBL_EKF(ExtendedKalmanFilter):
         self.Sigma += np.diag(alpha)
         # alpha
         S = np.dot(H, np.dot(self.Sigma, H.T)) + self.W
-        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S+1e-7))
+        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S))
         # self.s = (self.s + np.dot(K, (y - compute_poly(L, q, self.a))))
         I = np.eye(H.shape[1])
         self.Sigma = (np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T)
@@ -639,7 +666,7 @@ def single_smooth_update_iteration(state, F, B, C_w, C_u, N, k):
     return q, state, observation
 
 
-def get_trajectory(trajectory_time, F, B, C_w_sqrt, C_u, N, k, poly_c, new_edge_weight, num_edges_stateinit):
+def get_trajectory(trajectory_time, F, B, C_w_sqrt, C_u, N, k, poly_c, new_edge_weight, num_edges_stateinit, delta_n):
     position = []
     measurements_q = []
     measurements_y = []
@@ -653,7 +680,7 @@ def get_trajectory(trajectory_time, F, B, C_w_sqrt, C_u, N, k, poly_c, new_edge_
     for i in range(data_len):
         if (i % k == 0):
             binary_state = (state > 0).astype(float)
-            updated_connections, new_binary_state = change_edge_set(np.copy(binary_state))
+            updated_connections, new_binary_state = change_edge_set(np.copy(binary_state),delta_n)
             F_s = sample_matrix(np.copy(F), updated_connections)
             C_u_s = sample_matrix(np.copy(C_u), updated_connections)
             new_edges_indicator = ((new_binary_state - binary_state) > 0).astype(float)
@@ -662,6 +689,7 @@ def get_trajectory(trajectory_time, F, B, C_w_sqrt, C_u, N, k, poly_c, new_edge_
             state = generate_y(F_s, np.copy(state) + new_edge_weight * new_edges_indicator, C_u_s)
         else:
             state = generate_y(F_s, np.copy(state), C_u_s)
+        state = np.abs(state)
         q, observation = compute_measurements(build_L(B, np.copy(state)), C_w_sqrt, N, poly_c)
         updated_connections_list.append(updated_connections)
         state = np.abs(np.copy(state))
@@ -671,10 +699,11 @@ def get_trajectory(trajectory_time, F, B, C_w_sqrt, C_u, N, k, poly_c, new_edge_
     return position, measurements_q, measurements_y, updated_connections_list, stateInit
 
 
-def change_edge_set(state):
-    idx = np.random.choice(len(state))
+def change_edge_set(state, p=1):
+    # idx = np.random.choice(len(state))
+    indices = np.random.choice(len(state), size=p, replace=False)
     # Change the value at the chosen index (flip between 0 and 1)
-    state[idx] = 1 - state[idx]
+    state[indices] = 1 - state[indices]
     # Append the new vector to the list
     updated_connections = np.where(state > 0)[0]
     updated_connections = np.sort(updated_connections)

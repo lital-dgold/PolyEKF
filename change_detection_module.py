@@ -147,30 +147,38 @@ class ChangeDetectionMethod(nn.Module):
 
     def onlineDirectedGraphEstimtion(self, Delta_Y_t, Xt, L):
         # Delta_Y_t = Yt - compute_poly(L, Xt, self.a)
+        beta1 = self.lambda_1
+        beta2 = self.lambda_2
+        factor = 2
+        max_retry = 10
+        for attempt in range(max_retry):
+            # Optimization variable
+            Delta_S_t = cp.Variable((self.B.shape[1], 1), nonneg=True)
+            Delta_L = self.build_L_cvx(self.B, Delta_S_t)
+            Delta_Y_t_prime = compute_delta_Y_poly_cvx(L, Delta_L, Xt, self.a)
+            # Objective function
+            objective = cp.Minimize(
+                cp.norm(Delta_Y_t - Delta_Y_t_prime, 'fro') ** 2 +
+                beta1 * cp.norm1(Delta_L) +
+                beta2 * cp.normNuc(Delta_L)
+            )
 
-        # Optimization variable
-        Delta_S_t = cp.Variable((self.B.shape[1], 1))
-        Delta_L = self.build_L_cvx(self.B, Delta_S_t)
-        Delta_Y_t_prime = compute_delta_Y_poly_cvx(L, Delta_L, Xt, self.a)
-        # Objective function
-        objective = cp.Minimize(
-            cp.norm(Delta_Y_t - Delta_Y_t_prime, 'fro') ** 2 +
-            self.lambda_1 * cp.norm1(Delta_L) +
-            self.lambda_2 * cp.normNuc(Delta_L)
-        )
+            # Problem definition and solving
+            prob = cp.Problem(objective)
+            prob.solve()
+            # ----- 3.  success? -----------------------------------------------
+            if prob.status in (cp.OPTIMAL, cp.OPTIMAL_INACCURATE) and Delta_S_t.value is not None:
+                return Delta_S_t.value.astype(float)
 
-        # Problem definition and solving
-        problem = cp.Problem(objective)
-        try:
-            problem.solve(solver="CLARABEL", verbose=True)
-        except cp.SolverError:
-            # try:
-            #     problem.solve(solver="ECOS", abstol=1e-8, reltol=1e-8,verbose=True)
-            # except cp.SolverError:
-            problem.solve(solver="SCS", verbose=True)
+            # ----- 4.  fail → adapt & retry -----------------------------------
+            logging.warning(f"delta_s solve failed (status={prob.status}); "
+                            f"increasing beta to {beta1 * factor}")
+            beta1 *= factor
+            beta2 *= factor
 
-        # Solution
-        return Delta_S_t.value
+        logging.error("delta_s could not be found – skipping update this step")
+        return np.zeros_like(self.s)
+
 
     def forward(self, q, y, *args, **kwargs):
         L = build_L(self.B, self.s)
