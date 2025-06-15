@@ -150,9 +150,9 @@ def plot_state_as_graph(x, B, title_str):
 def nnls_wls(A, y, R):
     """
     Solve   min_{x >= 0} (y - A x)^T R^{-1} (y - A x)
-    by transforming into a standard NNLS call.
+    by transforming into poly_c standard NNLS call.
     """
-    # 1. Compute a Cholesky factor of R (R = Rt^T * Rt)
+    # 1. Compute poly_c Cholesky factor of R (R = Rt^T * Rt)
     Rt = cholesky(R, lower=False)  # so R = Rt^T @ Rt
 
     # 2. Form B = R^{-1/2} A and z = R^{-1/2} y
@@ -220,7 +220,7 @@ def compute_Jacobian_poly_dp_sparse(L: sp.spmatrix,
     D[P - 1] = sp.csr_matrix((N, N), dtype=L.dtype)  # D_{P-1}=0
 
     for p in range(P - 2, -1, -1):  # p = P-2 … 0
-        D[p] = L @ D[p + 1] + a[p + 1] * I  # <-- note a[p+1] !
+        D[p] = L @ D[p + 1] + a[p + 1] * I  # <-- note poly_c[p+1] !
 
     H = np.zeros((N, B.shape[1]), dtype=L.dtype)
     for j in range(B.shape[1]):
@@ -259,7 +259,7 @@ def compute_Jacobian_poly(L, B, q, a):
     N = L.shape[-1]
     E_max = B.shape[1]
     # Maximum power needed
-    max_power = len(a) - 1  # If a = [a_0, a_1, ..., a_m], need L^m
+    max_power = len(a) - 1  # If poly_c = [a_0, a_1, ..., a_m], need L^m
 
     # Precompute powers of L
     L_powers = [np.eye(N)]  # L^0 = I
@@ -267,7 +267,7 @@ def compute_Jacobian_poly(L, B, q, a):
         L_powers.append(np.matmul(L_powers[-1], L))
     H = np.zeros([N, E_max])
     for j in range(E_max):
-        # E_j with a single 1 at position (1,1), for example:
+        # E_j with poly_c single 1 at position (1,1), for example:
         E_j = np.zeros((E_max, E_max))
         E_j[j, j] = 1.0
         # Compute M_j = B E_j B^T
@@ -390,7 +390,7 @@ class FastExtendedKalmanFilter(KalmanFilt):
 
         # Calculate the Kalman Gain
         # K = Sigma * H'* inv(H*Sigma*H'+W)
-        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S + np.dot(1e-5, np.eye(S.shape[0]))))
+        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S + np.dot(1e-6, np.eye(S.shape[0]))))
         self.s = (self.s + np.dot(K, (y - compute_poly(L, q, self.a))))
         I = np.eye(H.shape[1])
         self.Sigma = np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K,
@@ -495,35 +495,50 @@ class oraclKalmanFilt_diagonalovariance_update(ExtendedKalmanFilter):
 
 
 class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
-    def __init__(self, F, B, C_u, C_w, C_x, StateInit, poly_c):
+    def __init__(self, F, B, C_u, C_w, C_x, StateInit, poly_c, new_connections_uncertainty_weight):
         super(oraclKalmanFilt_paper, self).__init__(F, B, C_u, C_w, C_x, StateInit, poly_c)
+        self.new_connections_uncertainty_weight = new_connections_uncertainty_weight
 
     def update(self, q, y, connections):
         L = build_L(self.B, self.s)
         # S = H*P*H'+W
         H = compute_Jacobian_poly_dp(L, self.B, q, self.a, self.edges)
         H = H[:, connections]
+
+        connections_int = np.asarray(connections, dtype=int)
+        old_connections = np.asarray(np.where(self.s > 0)[0], dtype=int)
+        new_connections = np.setdiff1d(connections_int, old_connections)
+        new_connections_uncertainty_matrix = np.zeros_like(self.Sigma)
+        new_connections_uncertainty_matrix[np.ix_(new_connections, new_connections)] = np.max(self.Sigma) # assuming that the matrix is diagonal
         # Concatenate H and the identity matrix vertically
-        S = np.dot(H, np.dot(self.Sigma[np.ix_(connections, connections)], H.T)) + self.W
+        uncertainty_sigma = self.Sigma + new_connections_uncertainty_matrix # sigma_with_new_connections_uncertainty
+        uncertainty_sigma_small = uncertainty_sigma[np.ix_(connections, connections)]
+        S = np.dot(H, np.dot(uncertainty_sigma_small, H.T)) + self.W
         # Calculate the Kalman Gain
         try:
             K = np.dot(
-                np.dot(self.Sigma[np.ix_(connections, connections)], H.T),
-                np.linalg.inv(S +  + np.dot(1e-5, np.eye(S.shape[0])))
-            )
+                np.dot(uncertainty_sigma_small, H.T),
+                np.linalg.inv(S))# + np.dot(1e-5, np.eye(S.shape[0])))
+            #)
         except np.linalg.LinAlgError as e:
-            print("Caught a singular matrix error in EKF update step.")
-            print("Matrix S shape:", S.shape)
-            print("Matrix S rank:", np.linalg.matrix_rank(S))
-            print("Matrix S:\n", S)
-            print("Connections:", connections)
-            print("H.T shape:", H.T.shape)
-            print("Sigma block shape:", self.Sigma[np.ix_(connections, connections)].shape)
+            logging.info("Caught poly_c singular matrix error in EKF update step.")
+            logging.info("Matrix S shape:", S.shape)
+            logging.info("Matrix S rank:", np.linalg.matrix_rank(S))
+            logging.info("Matrix S:\n", S)
+            logging.info("Connections:", connections)
+            logging.info("H.T shape:", H.T.shape)
+            logging.info("Sigma block shape:", uncertainty_sigma_small.shape)
             traceback.print_exc()  # full traceback for debugging
-            raise  # Re-raise if you want the program to crash after logging        self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
+            # try:
+            #     K = np.dot(
+            #         np.dot(uncertainty_sigma_small, H.T),
+            #         np.linalg.inv(S + np.dot(1e-3, np.eye(S.shape[0])))
+            #     )
+            # except np.linalg.LinAlgError as e:
+            logging.info("Caught singular matrix error in EKF update step of module oraclKalmanFilt_paper.")
         self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
         I = np.eye(H.shape[1])
-        Sigma_small = np.dot(np.dot((I - np.dot(K, H)), self.Sigma[np.ix_(connections, connections)]),
+        Sigma_small = np.dot(np.dot((I - np.dot(K, H)), uncertainty_sigma_small),
                              (I - np.dot(K, H)).T) + np.dot(K, np.dot(self.W, K.T))
         self.Sigma = np.zeros_like(self.Sigma)
         self.Sigma[np.ix_(connections, connections)] = Sigma_small
@@ -630,7 +645,7 @@ class SBL_EKF(ExtendedKalmanFilter):
         # alpha
         S = np.dot(H, np.dot(self.Sigma, H.T)) + self.W
         K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S))
-        # self.s = (self.s + np.dot(K, (y - compute_poly(L, q, self.a))))
+        # self.s = (self.s + np.dot(K, (y - compute_poly(L, q, self.poly_c))))
         I = np.eye(H.shape[1])
         self.Sigma = (np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T)
                       + np.dot(K, np.dot(self.W, K.T)))
@@ -732,15 +747,17 @@ def one_method_evaluation(kf, measurements_q, measurements_y, position, updated_
             zip(measurements_q, measurements_y, position, updated_connections_list)):
         start = time.time()
         x_est = kf(q, y, updated_connections)
-
         end = time.time()
         elapsed = end - start
-        logging.info(f"Iteration {i}: Execution time = {elapsed:.6f} seconds")
         mse = calc_mse(x_est, true_state)
+        logging.info(f"Iteration {i}: Execution time = {elapsed:.6f} seconds, mse={mse[0][0]}")
         mse_list.append(mse)
         F1_score_list.append(calc_f1_score(x_est, true_state))
         EIER_list.append(calc_edge_identification_error_rate_score(x_est, true_state))
         times_list.append(elapsed)
+        if mse[0][0].item() >1:
+            aa=3
+        x_est_prev = x_est
     return np.concatenate(mse_list), np.array(F1_score_list).reshape([i + 1, 1]), np.array(EIER_list).reshape(
         [i + 1, 1]), times_list
 

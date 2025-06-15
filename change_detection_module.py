@@ -7,6 +7,8 @@ import time,logging
 
 from torch.backends.mkl import verbose
 
+from fista_imp import Fista
+
 matplotlib.use('TkAgg')  # or 'Agg', 'Qt5Agg', etc. depending on your setup
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 import matplotlib.pyplot as plt
@@ -28,7 +30,7 @@ import cvxpy as cp
 def compute_delta_Y_poly_cvx(L, delta_s, q, a):
     """
     CVXPY-compatible version of compute_delta_Y_poly.
-    delta_s is a CVXPY variable.
+    delta_s is poly_c CVXPY variable.
     """
     N = L.shape[0]
     max_power = len(a) - 1
@@ -65,7 +67,7 @@ def compute_delta_Y_poly_cvx(L, delta_s, q, a):
 def precompute_P(L, q, a, B):
     """
     Build P such that  ΔY' = P · Δs
-    for a single input column q.
+    for poly_c single input column q.
 
     Parameters
     ----------
@@ -128,7 +130,7 @@ class ChangeDetectionMethod(nn.Module):
     @staticmethod
     def build_L_cvx(B, x):
         """
-        Constructs the Laplacian L = B * diag(x) * B.T in a CVXPY-compatible way.
+        Constructs the Laplacian L = B * diag(x) * B.T in poly_c CVXPY-compatible way.
 
         Parameters
         ----------
@@ -142,39 +144,73 @@ class ChangeDetectionMethod(nn.Module):
         L : cp.Expression
             Laplacian matrix expression, shape (N, N)
         """
-        gamma = cp.diag(x)  # Make a diagonal matrix from vector x
+        gamma = cp.diag(x)  # Make poly_c diagonal matrix from vector x
         return B @ gamma @ B.T  # CVXPY uses @ for matrix multiplication
 
     def onlineDirectedGraphEstimtion(self, Delta_Y_t, Xt, L):
-        # Delta_Y_t = Yt - compute_poly(L, Xt, self.a)
+        # Delta_Y_t = Yt - compute_poly(L, Xt, self.poly_c)
         beta1 = self.lambda_1
         beta2 = self.lambda_2
-        factor = 2
-        max_retry = 10
-        for attempt in range(max_retry):
-            # Optimization variable
-            Delta_S_t = cp.Variable((self.B.shape[1], 1), nonneg=True)
-            Delta_L = self.build_L_cvx(self.B, Delta_S_t)
-            Delta_Y_t_prime = compute_delta_Y_poly_cvx(L, Delta_L, Xt, self.a)
-            # Objective function
-            objective = cp.Minimize(
-                cp.norm(Delta_Y_t - Delta_Y_t_prime, 'fro') ** 2 +
-                beta1 * cp.norm1(Delta_L) +
-                beta2 * cp.normNuc(Delta_L)
-            )
+        # --- 1. data-dependent scaling factors --------------------------------------
+        sigma_Y = np.linalg.norm(Delta_Y_t, 'fro') + 1e-12  # avoid 0-division
+        sigma_L = 1#np.linalg.norm(L, 'fro') + 1e-12  # rough size of ΔL
 
-            # Problem definition and solving
-            prob = cp.Problem(objective)
-            prob.solve()
-            # ----- 3.  success? -----------------------------------------------
-            if prob.status in (cp.OPTIMAL, cp.OPTIMAL_INACCURATE) and Delta_S_t.value is not None:
-                return Delta_S_t.value.astype(float)
+        # renormalise the weights
+        beta1_scaled = beta1 * sigma_L / (sigma_Y ** 2)
+        beta2_scaled = beta2 * sigma_L / (sigma_Y ** 2)
 
-            # ----- 4.  fail → adapt & retry -----------------------------------
-            logging.warning(f"delta_s solve failed (status={prob.status}); "
-                            f"increasing beta to {beta1 * factor}")
-            beta1 *= factor
-            beta2 *= factor
+        # --- 2. CVXPY model ----------------------------------------------------------
+        Delta_S_t = cp.Variable((self.B.shape[1], 1))
+
+        # scaled decision variable   ΔL̃ = ΔL / σ_L  → norm1/nuc are O(1)
+        Delta_L_tilde = self.build_L_cvx(self.B, Delta_S_t) / sigma_L
+
+        # forward model already divided by σ_Y
+        Delta_Y_t_prime = compute_delta_Y_poly_cvx(
+            L,  # original Laplacian
+            Delta_L_tilde * sigma_L,  # undo scaling inside the model call
+            Xt, self.a
+        ) / sigma_Y
+
+        objective = cp.Minimize(
+            cp.sum_squares((Delta_Y_t / sigma_Y) - Delta_Y_t_prime)  # ‖·‖_F² / σ_Y²
+            + beta1_scaled * cp.norm1(Delta_L_tilde)  # β₁‖ΔL̃‖₁
+            + beta2_scaled * cp.normNuc(Delta_L_tilde)  # β₂‖ΔL̃‖_*
+        )
+
+        prob = cp.Problem(objective)
+
+        # # factor = 0.8
+        # # max_retry = 5
+        # # for attempt in range(max_retry):
+        # # Optimization variable
+        # Delta_S_t = cp.Variable((self.B.shape[1], 1))
+        # Delta_L = self.build_L_cvx(self.B, Delta_S_t)
+        # Delta_Y_t_prime = compute_delta_Y_poly_cvx(L, Delta_L, Xt, self.a)
+        # # Objective function
+        # objective = cp.Minimize(
+        #     cp.norm(Delta_Y_t - Delta_Y_t_prime, 'fro') ** 2 +
+        #     beta1 * cp.norm1(Delta_L) +
+        #     beta2 * cp.normNuc(Delta_L)
+        # )
+        #
+        # # Problem definition and solving
+        # prob = cp.Problem(objective)
+        solvers = ["MOSEK", "PROXSDP", "CLARABEL", "SCS"]  # order matters
+        for s in solvers:
+            try:
+                logging.info(f"Trying solver: {s}")
+                prob.solve(solver=s, verbose=False)
+                if prob.status == cp.OPTIMAL and Delta_S_t.value is not None:
+                    return Delta_S_t.value.astype(float)
+            except cp.SolverError as e:
+                logging.warning(f"{s} failed ({e}).")
+
+            # # ----- 4.  fail → adapt & retry -----------------------------------
+            # beta2 *= factor
+            # beta1 *= (factor**-1)
+            # logging.warning(f"delta_s solve failed (status={prob.status}); "
+            #                 f"increasing beta1 to {beta1} beta2 to {beta2}")
 
         logging.error("delta_s could not be found – skipping update this step")
         return np.zeros_like(self.s)
@@ -200,61 +236,20 @@ class ChangeDetectionMethod(nn.Module):
 class FastChangeDetectionMethod(ChangeDetectionMethod):
         def __init__(self, B, m, StateInit, poly_c, lambda_1=5, lambda_2=0):
             super(FastChangeDetectionMethod, self).__init__(B, m, StateInit, poly_c, lambda_1=lambda_1, lambda_2=lambda_2)
-            self.N = B.shape[0]
-            self.M1 = B.shape[1]
-            self.Y_param = cp.Parameter((self.N, 1))
-            self.Delta_S = cp.Variable((self.M1, 1), nonneg=True)  # optimisation variable
-            self.P = cp.Parameter((self.N, self.M1))
-            resid = self.Y_param - self.P @ self.Delta_S
-            if self.lambda_2 > 0: #cp.sum_squares(resid) \
-                obj = cp.norm(resid, 'fro') ** 2 \
-                  + self.lambda_1 * cp.norm1(self.Delta_S)  \
-                  + self.lambda_2 * cp.normNuc(self.Delta_L)
-            else:#cp.sum_squares(resid) \
-                obj = cp.norm(resid, 'fro') ** 2 \
-                  + self.lambda_1 * cp.norm1(self.B @ cp.diag(self.Delta_S) @ self.B.T)
 
-            self.prob = cp.Problem(cp.Minimize(obj))
 
         def onlineDirectedGraphEstimtion(self, Delta_Y_t, Xt, L):
-            Delta_S_t = cp.Variable((self.B.shape[1], 1))
-            # Delta_L = self.build_L_cvx(self.B, Delta_S_t)
-            # Delta_Y_t_prime = compute_delta_Y_poly_cvx(L, Delta_L, Xt, self.a)
-            # # Objective function
-            # objective = cp.Minimize(
-            #     cp.norm(Delta_Y_t - Delta_Y_t_prime, 'fro') ** 2 +
-            #     self.lambda_1 * cp.norm1(Delta_L) +
-            #     self.lambda_2 * cp.normNuc(Delta_L)
-            # )
-            #
-            # # Problem definition and solving
-            # problem = cp.Problem(objective)
-            # problem.solve(solver="CLARABEL", verbose=True)
-            #######
-
-            # if (self.Y_param.value is not None) and (self.Y_param.value.shape != Delta_Y_t.shape):
-            #     self.Y_param = cp.Parameter((Delta_Y_t.shape[0] * Delta_Y_t.shape[1], 1))
-            #     self.P = cp.Parameter((Delta_Y_t.shape[0] * Delta_Y_t.shape[1], self.M1))
-            #
-            # self.Y_param.value = Delta_Y_t.reshape(-1, 1, order="F")
-            # once per time-step (or whenever L changes)
             P_blocks = []
             for j in range(Xt.shape[1]):
                 Pj = precompute_P(L, Xt[:, [j]], self.a, self.B).toarray()
                 P_blocks.append(Pj)  # N×E                     # N×1
             # self.P.value = np.vstack(P_blocks)
             # self.prob.solve(verbose=True)  #warm_start=True , solver=cp.OSQP)  # or MOSEK/SCS
-            objective = cp.Minimize(
-                cp.norm(Delta_Y_t.reshape(-1, 1, order="F") - np.vstack(P_blocks) @ Delta_S_t , 'fro') ** 2 +
-                self.lambda_1 * cp.norm1(self.B @ cp.diag(Delta_S_t) @ self.B.T)
-                 + self.lambda_2 * cp.normNuc(self.B @ cp.diag(Delta_S_t) @ self.B.T)
-            )
 
-            # Problem definition and solving
-            problem = cp.Problem(objective)
-            problem.solve(solver="CLARABEL", verbose=True)
-            # zzzz= np.linalg.norm(self.Delta_S.value - Delta_S_t.value)
-            return Delta_S_t.value#self.Delta_S.value
+            solver = Fista(lambda_=self.lambda_1, loss='least-square', penalty='l11', n_iter=1000,
+            recompute_Lipschitz_constant=False)
+            Delta_S_t = solver.fit(np.vstack(P_blocks),Delta_Y_t.reshape(-1, 1), verbose=0)
+            return Delta_S_t.coefs_#self.Delta_S.value
 
 
 
@@ -275,6 +270,15 @@ if __name__ == "__main__":
     trials = 5              # repeat to be sure
     tol = 1e-9              # numeric tolerance for equality
 
+    solver = Fista(lambda_=0.5, loss='least-square', penalty='l11', n_iter=1000,
+                   recompute_Lipschitz_constant=False)
+    x = np.zeros(M).reshape([M, 1])
+    x[3] = 10
+    A  = rng.standard_normal((N, M))
+    y = np.matmul(A,x)
+    Delta_S_t = solver.fit(A, y, verbose=1).coefs_
+    err = np.linalg.norm(Delta_S_t - x, ord='fro')
+
     # ---------- run several random checks -----------------------
     for t in range(trials):
         G = nx.complete_graph(N, create_using=None)
@@ -288,32 +292,36 @@ if __name__ == "__main__":
         L0 = B @ sp.diags(s0.ravel()) @ B.T  # Laplacian
 
         # polynomial coefficients  a0 … aK  (a0 unused in derivative)
-        a = rng.standard_normal(Kdeg + 1)
+        poly_c = rng.standard_normal(Kdeg + 1)
 
         # random window of inputs  X ∈ ℝ^{N×r}
         X = rng.standard_normal((N, r))
 
         # random perturbation  Δs
         Δs = np.zeros((M,1))
-        Δs[idx_list] = rng.standard_normal((E, 1))
+        Δs[0] = new_edge_weight
 
         # ---- slow path: build ΔL, call compute_delta_Y_poly_cvx ---
         ΔL = B @ sp.diags(Δs.ravel()) @ B.T
         # slow_cols = []
         # for j in range(r):
-        slow_cols = compute_delta_Y_poly_cvx(L0, ΔL, X, a)
+        Yprime_slow = compute_delta_Y_poly_cvx(L0, ΔL, X, poly_c)
             # slow_cols.append(col)
-        ΔYprime_slow = ΔYprime_slow.reshape(-1, 1, order="F")
+        Yprime_slow = Yprime_slow.reshape(-1, 1, order="F")
         # ---- fast path: use P_j blocks ----------------------------
         P_blocks = []
         for j in range(r):
-            Pj = precompute_P(L0, X[:, [j]], a, B).toarray()
+            Pj = precompute_P(L0, X[:, [j]], poly_c, B).toarray()
             P_blocks.append(Pj)# N×E                     # N×1
         Big_P = np.vstack(P_blocks)
-        ΔYprime_fast = Big_P @ Δs# N×r
+        Yprime_fast = Big_P @ Δs# N×r
 
+        #-------------
+        obj_1 = FastChangeDetectionMethod(B, B.shape[1], np.ones(B.shape[0]), poly_c, lambda_1=5, lambda_2=0)
+        est = obj_1.onlineDirectedGraphEstimtion(Yprime_slow, X, L0)
         # ---- compare ---------------------------------------------
-        err = np.linalg.norm(ΔYprime_fast - ΔYprime_slow, ord='fro')
+        err = np.linalg.norm(est - Δs, ord='fro')
+        # err = np.linalg.norm(Yprime_fast - Yprime_slow, ord='fro')
         print(f"trial {t}:  ‖fast − slow‖_F = {err:.3e}")
         assert err < tol, "Mismatch!  Something is wrong."
 
@@ -321,4 +329,4 @@ if __name__ == "__main__":
 
 
 
-    a=2
+    poly_c=2

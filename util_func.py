@@ -104,7 +104,7 @@ def map_B_to_set(B):
         if len(nonzero_indices) != 2:
             raise ValueError(f"Column {col} does not have exactly two nonzero entries.")
 
-        # Append as a tuple
+        # Append as poly_c tuple
         index_pairs.append(tuple(nonzero_indices))
 
     return index_pairs
@@ -161,7 +161,7 @@ def compute_poly(L, q, a):
     # if isinstance(q, torch.Tensor):
     #     signal_out = torch.from_numpy(signal_out).float()
 
-    max_power = len(a)  # If a = [a_0, a_1, ..., a_m], need L^m
+    max_power = len(a)  # If poly_c = [a_0, a_1, ..., a_m], need L^m
 
     # Precompute powers of L
     # L_powers = [np.eye(N)]  # L^0 = I
