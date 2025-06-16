@@ -59,8 +59,8 @@ def generate_H(B, q):
     return np.dot(B, vector2diag(np.dot(B.T, q)))
 
 
-def generate_y(H, x, C_w):
-    observation = np.dot(H, x) + np.dot(C_w, np.random.normal(size=(H.shape[0], 1)))
+def generate_y(H, x, C_w_sqrt):
+    observation = np.dot(H, x) + np.dot(C_w_sqrt, np.random.normal(size=(H.shape[0], 1)))
     return observation
 
 
@@ -390,7 +390,7 @@ class FastExtendedKalmanFilter(KalmanFilt):
 
         # Calculate the Kalman Gain
         # K = Sigma * H'* inv(H*Sigma*H'+W)
-        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S + np.dot(1e-6, np.eye(S.shape[0]))))
+        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S + np.dot(1e-5, np.eye(S.shape[0]))))
         self.s = (self.s + np.dot(K, (y - compute_poly(L, q, self.a))))
         I = np.eye(H.shape[1])
         self.Sigma = np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K,
@@ -504,41 +504,33 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
         # S = H*P*H'+W
         H = compute_Jacobian_poly_dp(L, self.B, q, self.a, self.edges)
         H = H[:, connections]
-
-        connections_int = np.asarray(connections, dtype=int)
-        old_connections = np.asarray(np.where(self.s > 0)[0], dtype=int)
-        new_connections = np.setdiff1d(connections_int, old_connections)
-        new_connections_uncertainty_matrix = np.zeros_like(self.Sigma)
-        new_connections_uncertainty_matrix[np.ix_(new_connections, new_connections)] = np.max(self.Sigma) # assuming that the matrix is diagonal
         # Concatenate H and the identity matrix vertically
-        uncertainty_sigma = self.Sigma + new_connections_uncertainty_matrix # sigma_with_new_connections_uncertainty
-        uncertainty_sigma_small = uncertainty_sigma[np.ix_(connections, connections)]
-        S = np.dot(H, np.dot(uncertainty_sigma_small, H.T)) + self.W
+        S = np.dot(H, np.dot(self.Sigma[np.ix_(connections, connections)], H.T)) + self.W
         # Calculate the Kalman Gain
         try:
             K = np.dot(
-                np.dot(uncertainty_sigma_small, H.T),
-                np.linalg.inv(S))# + np.dot(1e-5, np.eye(S.shape[0])))
-            #)
+                np.dot(self.Sigma[np.ix_(connections, connections)], H.T),
+                np.linalg.inv(S + np.dot(1e-6, np.eye(S.shape[0])))
+            )
         except np.linalg.LinAlgError as e:
-            logging.info("Caught poly_c singular matrix error in EKF update step.")
-            logging.info("Matrix S shape:", S.shape)
-            logging.info("Matrix S rank:", np.linalg.matrix_rank(S))
-            logging.info("Matrix S:\n", S)
-            logging.info("Connections:", connections)
-            logging.info("H.T shape:", H.T.shape)
-            logging.info("Sigma block shape:", uncertainty_sigma_small.shape)
-            traceback.print_exc()  # full traceback for debugging
-            # try:
-            #     K = np.dot(
-            #         np.dot(uncertainty_sigma_small, H.T),
-            #         np.linalg.inv(S + np.dot(1e-3, np.eye(S.shape[0])))
-            #     )
-            # except np.linalg.LinAlgError as e:
-            logging.info("Caught singular matrix error in EKF update step of module oraclKalmanFilt_paper.")
+            print("Caught a singular matrix error in EKF update step.")
+            print("Matrix S shape:", S.shape)
+            print("Matrix S rank:", np.linalg.matrix_rank(S))
+            print("Matrix S:\n", S)
+            print("Connections:", connections)
+            print("H.T shape:", H.T.shape)
+            print("Sigma block shape:", self.Sigma[np.ix_(connections, connections)].shape)
+            try:
+                K = np.dot(
+                    np.dot(self.Sigma[np.ix_(connections, connections)], H.T),
+                    np.linalg.inv(S + np.dot(np.max(self.Sigma[np.ix_(connections, connections)]), np.eye(S.shape[0])))
+                )
+            except np.linalg.LinAlgError as e:
+                traceback.print_exc()  # full traceback for debugging
+                raise  # Re-raise if you want the program to crash after logging        self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
         self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
         I = np.eye(H.shape[1])
-        Sigma_small = np.dot(np.dot((I - np.dot(K, H)), uncertainty_sigma_small),
+        Sigma_small = np.dot(np.dot((I - np.dot(K, H)), self.Sigma[np.ix_(connections, connections)]),
                              (I - np.dot(K, H)).T) + np.dot(K, np.dot(self.W, K.T))
         self.Sigma = np.zeros_like(self.Sigma)
         self.Sigma[np.ix_(connections, connections)] = Sigma_small
@@ -681,7 +673,7 @@ def single_smooth_update_iteration(state, F, B, C_w, C_u, N, k):
     return q, state, observation
 
 
-def get_trajectory(trajectory_time, F, B, C_w_sqrt, C_u, N, k, poly_c, new_edge_weight, num_edges_stateinit, delta_n):
+def get_trajectory(trajectory_time, F, B, C_w_sqrt, C_u_sqrt, N, k, poly_c, new_edge_weight, num_edges_stateinit, delta_n):
     position = []
     measurements_q = []
     measurements_y = []
@@ -697,13 +689,17 @@ def get_trajectory(trajectory_time, F, B, C_w_sqrt, C_u, N, k, poly_c, new_edge_
             binary_state = (state > 0).astype(float)
             updated_connections, new_binary_state = change_edge_set(np.copy(binary_state),delta_n)
             F_s = sample_matrix(np.copy(F), updated_connections)
-            C_u_s = sample_matrix(np.copy(C_u), updated_connections)
+            C_u_s_sqrt = sample_matrix(np.copy(C_u_sqrt), updated_connections)
             new_edges_indicator = ((new_binary_state - binary_state) > 0).astype(float)
             if np.sum(new_edges_indicator) > 0:
                 print("new edge was added")
-            state = generate_y(F_s, np.copy(state) + new_edge_weight * new_edges_indicator, C_u_s)
+            state = generate_y(F_s, np.copy(state) + new_edge_weight * new_edges_indicator, C_u_s_sqrt)
         else:
-            state = generate_y(F_s, np.copy(state), C_u_s)
+            updated_connections = np.where(state > 0)[0]
+            updated_connections = np.sort(updated_connections)
+            C_u_s_sqrt = sample_matrix(np.copy(C_u_sqrt), updated_connections)
+            F_s = sample_matrix(np.copy(F), updated_connections)
+            state = generate_y(F_s, np.copy(state), C_u_s_sqrt)
         state = np.abs(state)
         q, observation = compute_measurements(build_L(B, np.copy(state)), C_w_sqrt, N, poly_c)
         updated_connections_list.append(updated_connections)
@@ -755,7 +751,7 @@ def one_method_evaluation(kf, measurements_q, measurements_y, position, updated_
         F1_score_list.append(calc_f1_score(x_est, true_state))
         EIER_list.append(calc_edge_identification_error_rate_score(x_est, true_state))
         times_list.append(elapsed)
-        if mse[0][0].item() >1:
+        if mse[0][0].item() >3:
             aa=3
         x_est_prev = x_est
     return np.concatenate(mse_list), np.array(F1_score_list).reshape([i + 1, 1]), np.array(EIER_list).reshape(

@@ -7,6 +7,29 @@ import pickle
 matplotlib.use('TkAgg')  # or 'Agg', 'Qt5Agg', etc. depending on your setup
 
 
+import os, psutil, time, math
+
+def pick_worker_count(reserve_cores: int = 1,
+                      idle_thresh: int = 20,
+                      sample_secs: float = 0.2) -> int:
+    """
+    Return the number of workers that should be safe to spin up *right now*.
+
+    reserve_cores  – always leave this many logical cores completely free
+    idle_thresh    – treat a core as 'idle' if current util < this %
+    sample_secs    – how long to measure utilisation
+    """
+    logical = os.cpu_count() or 1
+
+    # single short sample – cheap enough for interactive jobs
+    usage = psutil.cpu_percent(interval=sample_secs, percpu=True)
+    idle_cores = sum(u < idle_thresh for u in usage)
+
+    # leave a buffer so you don’t grab every last idle core
+    safe = max(1, idle_cores - reserve_cores)
+    return min(safe, logical - reserve_cores)
+
+max_workers = pick_worker_count()
 
 
 
