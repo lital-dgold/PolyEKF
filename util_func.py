@@ -8,6 +8,41 @@ matplotlib.use('TkAgg')  # or 'Agg', 'Qt5Agg', etc. depending on your setup
 
 
 import os, psutil, time, math
+from numpy.linalg import svd
+
+
+def pseudo_inv(A, thr=None):
+    """
+    Return the Moore–Penrose pseudo-inverse of a matrix A.
+
+    Parameters
+    ----------
+    A : (m, n) array_like
+        Input matrix (real or complex).
+    thr : float, optional
+        Singular values <= thr are treated as zero.
+        If None, an adaptive threshold max(m, n) * eps * max(s) is used,
+        where eps is machine precision for A’s dtype and s are the singular values.
+
+    Returns
+    -------
+    A_pinv : (n, m) ndarray
+        The pseudo-inverse of A.
+    """
+    # Economy-size SVD (cheaper, gives U:(m×r), Vt:(r×n) where r = rank)
+    U, s, Vt = svd(A, full_matrices=False)
+
+    # Automatic tolerance if not provided
+    if thr is None:
+        thr = max(A.shape) * np.finfo(s.dtype).eps * s.max()
+
+    # Invert the singular values above the threshold
+    s_inv = np.where(s > thr, 1.0 / s, 0.0)
+
+    # Re-compose: V * Σ⁻¹ * Uᵀ   (note: Vt is Vᵀ)
+    A_pinv = (Vt.T * s_inv) @ U.T
+    return A_pinv
+
 
 def pick_worker_count(reserve_cores: int = 1,
                       idle_thresh: int = 20,
@@ -80,9 +115,9 @@ def unit_func(x):
 def mean_func(table):
     return table.mean(axis=1)
 
-def plot_vs_parameter(time, runs, metric, aggregation_func=unit_func, methods_to_plot=None, log_format=False, x_label1="", to_save=False, suffix=""):
+def plot_vs_parameter(parameter_values_list, runs, metric, aggregation_func=unit_func, methods_to_plot=None, log_format=False, x_label1="", to_save=False, suffix=""):
     mean_metric_along_trajectory = []
-    for idx in range(len(time)):
+    for idx in range(len(parameter_values_list)):
         methods_dict = compute_metric_summary(runs[idx], metric)
         mean_metric_along_trajectory.append(methods_dict)
     methods_list = methods_to_plot if methods_to_plot is not None else mean_metric_along_trajectory[0].keys()
@@ -92,14 +127,14 @@ def plot_vs_parameter(time, runs, metric, aggregation_func=unit_func, methods_to
             metric_along_trajectory_vs_parameter = np.stack([r[method] for r in mean_metric_along_trajectory]).squeeze()
             y = aggregation_func(metric_along_trajectory_vs_parameter)
             if log_format:
-                plt.plot(time, 10 * np.log10(y), label=method)
+                plt.plot(parameter_values_list, 10 * np.log10(y), label=method)
             else:
-                plt.plot(time, y, label=method)
+                plt.plot(parameter_values_list, y, label=method)
     plt.xlabel(x_label1)
     postfix = " [dB]" if log_format else ""
     YLABEL = metric.upper() + postfix
     plt.ylabel(YLABEL)
-    plt.xlim(time[0], time[-1])
+    plt.xlim(parameter_values_list[0], parameter_values_list[-1])
     plt.grid()
     plt.legend()
     if to_save:

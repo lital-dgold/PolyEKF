@@ -20,7 +20,7 @@ if __name__ == "__main__":
     to_plot_linear_case_vs_time = False
     to_plot_non_linear_case_vs_time = False
     to_plot_non_linear_case_2_vs_time = False
-    to_plot_non_linear_case_2_vs_snr = False
+    to_plot_non_linear_case_2_vs_snr = True
     to_plot_non_linear_case_2_vs_sparsity = False
     to_plot_non_linear_case_2_vs_graph_variation = False
     to_plot_non_linear_case_2_vs_change_sizes = True
@@ -132,17 +132,20 @@ if __name__ == "__main__":
     #########################################################################
     if to_plot_non_linear_case_2_vs_snr:
         try:
-            orig_file_name = "performance_vs_snr_5order.pkl"
-            new_data_file_name = "performance_vs_snr_5order_oracle.pkl"
-            merged_data_file_name = "performance_vs_snr_5order_merged.pkl"
-            snr_dict_list = update_performance_vs_parameter_data(orig_file_name, new_data_file_name, merged_data_file_name)
+            orig_file_name = "performance_vs_snr_5order_10nodes100MC_oracle.pkl"
+            sigma_w_list = np.logspace(-2, -0.5, 5)
+            #
             # orig_file_name = "performance_vs_snr_5order.pkl"
-            # with open(orig_file_name, "rb") as f:
-            #     snr_dict_list = pickle.load(f)
-            sigma_w_list = np.logspace(-1.5, 1.5, 10)
+            # new_data_file_name = "performance_vs_snr_5order_oracle.pkl"
+            # merged_data_file_name = "performance_vs_snr_5order_merged.pkl"
+            # snr_dict_list = update_performance_vs_parameter_data(orig_file_name, new_data_file_name, merged_data_file_name)
+            # # orig_file_name = "performance_vs_snr_5order.pkl"
+            with open(orig_file_name, "rb") as f:
+                snr_dict_list = pickle.load(f)
+            # sigma_w_list = np.logspace(-1.5, 1.5, 10)
 
-            plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "mse", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="sigma_W [dB]", to_save=True, suffix="snr_5order_without_first_n")
-            plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "eier", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="sigma_W [dB]", to_save=True, suffix="snr_5order_without_first_n")
+            # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "mse", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="sigma_W [dB]", to_save=True, suffix="snr_5order_without_first_n")
+            # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "eier", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="sigma_W [dB]", to_save=True, suffix="snr_5order_without_first_n")
 
             plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="sigma_W [dB]", to_save=True, suffix="snr_5order_all")
             plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="sigma_W [dB]", to_save=True, suffix="snr_5order_all")
