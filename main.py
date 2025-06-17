@@ -74,30 +74,30 @@ def single_monte_carlo(
     cfg.update({"C_x": np.dot(cfg["sigma_x"] ** 2, vector2diag(stateInit))})
     for name in active_methods:
         filt = METHOD_REGISTRY[name](cfg)
-        try:
-            start = time.time()
-            mse, f1, eier, times = one_method_evaluation(
-                filt, q_meas, y_meas, pos, conn
-            )
-            end = time.time()
-            if mse.mean().item() > 2:
-                filt = oraclKalmanFilt_paper(
-                    cfg["F"], cfg["B"], cfg["C_u"], cfg["C_w"],
-                    cfg["C_x"], cfg["stateInit"], cfg["poly_coefficients"], cfg["new_edge_weight"]
-                )
-                mse, f1, eier, times = one_method_evaluation(
-                    filt, q_meas, y_meas, pos, conn
-                )
-        except np.linalg.LinAlgError as e:
-            traceback.print_exc()  # full traceback for debugging
-            filt = oraclKalmanFilt_paper(
-                cfg["F"], cfg["B"], cfg["C_u"], cfg["C_w"],
-                cfg["C_x"], cfg["stateInit"], cfg["poly_coefficients"], cfg["new_edge_weight"]
-            )
-            mse, f1, eier, times = one_method_evaluation(
-                filt, q_meas, y_meas, pos, conn
-            )
-            raise
+        # try:
+        start = time.time()
+        mse, f1, eier, times = one_method_evaluation(
+            filt, q_meas, y_meas, pos, conn
+        )
+        end = time.time()
+            # if mse.mean().item() > 2:
+            #     filt = oraclKalmanFilt_paper(
+            #         cfg["F"], cfg["B"], cfg["C_u"], cfg["C_w"],
+            #         cfg["C_x"], cfg["stateInit"], cfg["poly_coefficients"], cfg["new_edge_weight"]
+            #     )
+            #     mse, f1, eier, times = one_method_evaluation(
+            #         filt, q_meas, y_meas, pos, conn
+            #     )
+        # except np.linalg.LinAlgError as e:
+        #     traceback.print_exc()  # full traceback for debugging
+        #     filt = oraclKalmanFilt_paper(
+        #         cfg["F"], cfg["B"], cfg["C_u"], cfg["C_w"],
+        #         cfg["C_x"], cfg["stateInit"], cfg["poly_coefficients"], cfg["new_edge_weight"]
+        #     )
+        #     mse, f1, eier, times = one_method_evaluation(
+        #         filt, q_meas, y_meas, pos, conn
+        #     )
+        #     raise
         elapsed = end - start
         logging.info(f"Run {name}: Execution time = {elapsed:.6f} seconds")
         results[name] = dict(mse=mse, f1=f1, eier=eier, times=times)
@@ -161,10 +161,10 @@ def _performance_vs_snr(sigma_w1,base_cfg, n, num_iterations, active_methods):
     return sigma_w1, run_monte_carlo_simulation(cfg, num_iterations, active_methods)
 
 
-def _performance_vs_change_size(delta_n, base_cfg, n, num_iterations, active_methods):
+def _performance_vs_change_size(delta_n, base_cfg, max_edges, num_iterations, active_methods):
     cfg = copy.deepcopy(base_cfg)  # avoid concurrent mutation
     logging.info(f"change rate={delta_n} * n %\n")
-    cfg.update({"delta_n": int(delta_n * n)})
+    cfg.update({"delta_n": int(0.1 * delta_n * max_edges)})
     return delta_n, run_monte_carlo_simulation(cfg, num_iterations, active_methods)
 
 
@@ -398,51 +398,51 @@ if __name__ == "__main__":
     # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="sigma_W [dB]", to_save=True, suffix="mse_vs_snr_nonlinear_oracle")
     # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="sigma_W [dB]",to_save=True, suffix="eier_vs_snr_nonlinear_oracle")
 
+    # #########################################################################
+    # ############## - Performance vs. rate of graph variations  ##############
+    # #########################################################################
+    # with simulation("Non-Linear case - Performance vs. graph variation"):
+    #     active_methods = ("fast-ekf", "gsp-ekf", "oracle-block", "change-det")
+    #     num_iterations = 100
+    #     poly_coefficients = np.array([0.0, 1.0, 0.8, 0.6, 0.4, 0.2]) #np.array([1.0, 1.0, 1.0, 1.0]) #
+    #     cfg.update({"poly_coefficients": poly_coefficients})
+    #     num_time_samples = 79
+    #     sigma_w = 0.2 ** 0.5
+    #     trajectory_time = np.arange(0, num_time_samples)
+    #     cfg.update({"trajectory_time": trajectory_time})
+    #     C_w_sqrt = np.dot(sigma_w, np.eye(n))
+    #     cfg.update({"C_w_sqrt": C_w_sqrt})
+    #     cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
+    #     C_u_sqrt = np.dot(sigma_v, np.eye(cfg["C_u"].shape[0]))
+    #     cfg.update({"C_u_sqrt": C_u_sqrt, "C_u": C_u_sqrt @ C_u_sqrt})
+    #     cfg.update({"num_edges_stateinit": 2 * n})
+    #     arr1 = np.array([0.1])
+    #     arr2 = np.linspace(0.25, 2, 8)
+    #     k_list = np.concatenate([arr1, arr2])
+    #     # ---------- parallel sweep ----------
+    #     k_dict_list = [None] * len(k_list)  # preserve order
+    #     max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
+    #
+    #     with ProcessPoolExecutor(max_workers=max_workers) as exe:
+    #         futures = {exe.submit(_performance_vs_change_rate, e, cfg, n, num_iterations, active_methods): i
+    #                    for i, e in enumerate(k_list)}
+    #         for fut in as_completed(futures):
+    #             idx = futures[fut]  # original position
+    #             _, result = fut.result()  # (num_edges, runs_linear)
+    #             k_dict_list[idx] = result
+    # # Save
+    # with open("performance_vs_k_5order_10nodes100MC_k01.pkl", "wb") as f:
+    #     pickle.dump(k_dict_list, f)
+    #
+    # plot_vs_parameter(k_list, k_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Delta t [xN]", to_save=True, suffix="mse_vs_k_nonlinear_all")
+    # plot_vs_parameter(k_list, k_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Delta t [xN]", to_save=True, suffix="eier_vs_k_nonlinear_all")
     #########################################################################
     ############## - Performance vs. rate of graph variations  ##############
     #########################################################################
     with simulation("Non-Linear case - Performance vs. graph variation"):
-        active_methods = ("oracle-block",)#("fast-ekf", "gsp-ekf", "oracle-block", "change-det")
+        poly_coefficients = np.array([0.0, 1.0, 0.8, 0.6, 0.4, 0.2]) #np.array([1.0, 1.0, 1.0, 1.0]) #
+        cfg.update({"poly_coefficients": poly_coefficients})
         num_iterations = 100
-        num_time_samples = 79
-        sigma_w = 0.2 ** 0.5
-        trajectory_time = np.arange(0, num_time_samples)
-        cfg.update({"trajectory_time": trajectory_time})
-        C_w_sqrt = np.dot(sigma_w, np.eye(n))
-        cfg.update({"C_w_sqrt": C_w_sqrt})
-        cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
-        C_u_sqrt = np.dot(sigma_v, np.eye(cfg["C_u"].shape[0]))
-        cfg.update({"C_u_sqrt": C_u_sqrt, "C_u": C_u_sqrt @ C_u_sqrt})
-        cfg.update({"num_edges_stateinit": 2 * n})
-        k_list = np.linspace(0.25, 2, 8)
-        # ---------- parallel sweep ----------
-        k_dict_list = [None] * len(k_list)  # preserve order
-        max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
-
-        with ProcessPoolExecutor(max_workers=max_workers) as exe:
-            futures = {exe.submit(_performance_vs_change_rate, e, cfg, n, num_iterations, active_methods): i
-                       for i, e in enumerate(k_list)}
-            for fut in as_completed(futures):
-                idx = futures[fut]  # original position
-                _, result = fut.result()  # (num_edges, runs_linear)
-                k_dict_list[idx] = result
-    # Save
-    with open("performance_vs_k_5order_10nodes100MC.pkl", "wb") as f:
-        pickle.dump(k_dict_list, f)
-
-    plot_vs_parameter(k_list, k_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Delta t [xN]", to_save=True, suffix="mse_vs_k_nonlinear_all")
-    plot_vs_parameter(k_list, k_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Delta t [xN]", to_save=True, suffix="eier_vs_k_nonlinear_all")
-    #########################################################################
-    ############## - Performance vs. rate of graph variations  ##############
-    #########################################################################
-    with simulation("Non-Linear case - Performance vs. graph variation"):
-        # num_iterations = 2
-        # cfg["lambda_1"] = 10
-        # poly_coefficients = np.array(
-        #     [0.0, 1.0, 0.8, 0.6, 0.4, 0.2])  # np.array([0.0, 1.0, 0.75, 0.5, 0.25])##np.array([1.0, 1.0, 1.0, 1.0])#
-        # cfg.update({"poly_coefficients": poly_coefficients})
-        #  # poly_coefficients = np.array([0.0, 1.0, 0.75, 0.5, 0.25])
-        # cfg.update({"poly_coefficients": poly_coefficients})
         num_time_samples = 79
         sigma_w = 0.2 ** 0.5
         trajectory_time = np.arange(0, num_time_samples)
@@ -453,13 +453,13 @@ if __name__ == "__main__":
         cfg.update({"k": 2 * n})
         # cfg.update({"num_edges_stateinit": 2 * n})
 
-        delta_n_list = np.linspace(1, 9, 5)#np.logspace(-1, 0.5, 8)
+        delta_n_list = np.linspace(1, 5, 5)#np.logspace(-1, 0.5, 8)
         # ---------- parallel sweep ----------
         delta_n_dict_list = [None] * len(delta_n_list)  # preserve order
         max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
 
         with ProcessPoolExecutor(max_workers=max_workers) as exe:
-            futures = {exe.submit(_performance_vs_change_size, e, cfg, n, num_iterations, active_methods): i
+            futures = {exe.submit(_performance_vs_change_size, e, cfg, m, num_iterations, active_methods): i
                        for i, e in enumerate(delta_n_list)}
             for fut in as_completed(futures):
                 idx = futures[fut]  # original position
@@ -469,21 +469,16 @@ if __name__ == "__main__":
     with open("performance_vs_change_size_5order_10nodes.pkl", "wb") as f:
         pickle.dump(delta_n_dict_list, f)
 
-    #
-    # plot_vs_parameter(sparsity_list, k_dict_list, "mse", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="Sparsity [%]")
-    # plot_vs_parameter(sparsity_list, k_dict_list, "eier", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="Sparsity [%]")
+
+    # plot_vs_parameter(10 * delta_n_list, delta_n_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="#connection changes [%]", to_save=True, suffix="mse_vs_connection_change_nonlinear_all")
+    # plot_vs_parameter(10 * delta_n_list, delta_n_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="#connection changes [%]", to_save=True, suffix="eier_vs_connection_change_nonlinear_all")
 
     ########################################################################
     ############# - Performance vs. sparsity level  ########################
     ########################################################################
     with simulation("Non-Linear case - Performance vs. sparsity level"):
-        num_iterations = 1000
+        num_iterations = 100
         sigma_w = 0.2 ** 0.5
-        # if num_edges <= 30:
-        #     cfg["thr1"] = 0.2
-        #     cfg["lambda_1"] = 0.2
-        # else:
-        # cfg["lambda_1"] = 4
         poly_coefficients = np.array(
             [0.0, 1.0, 0.8, 0.6, 0.4, 0.2])  # np.array([0.0, 1.0, 0.75, 0.5, 0.25])##np.array([1.0, 1.0, 1.0, 1.0])#
         cfg.update({"poly_coefficients": poly_coefficients})
@@ -494,16 +489,13 @@ if __name__ == "__main__":
         C_w_sqrt = np.dot(sigma_w, np.eye(n))  # scipy.linalg.toeplitz(c)#
         cfg.update({"C_w_sqrt": C_w_sqrt})
         cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
+        C_u_sqrt = np.dot(0.05 ** 0.5, np.eye(m))
+        cfg.update({"C_u": C_u_sqrt @ C_u_sqrt, "C_u_sqrt": C_u_sqrt})
         sparsity_list = np.linspace(10, 50, 5)
-        # Run in series
-        # sparsity_dict_list = []
-        #
-        # for num_edges in sparsity_list:
-        #     _, result = _performance_vs_sparsity(num_edges, cfg, m, num_iterations, active_methods)
-        #     sparsity_dict_list.append(result)
+        cfg.update({"k": n})
         # ---------- parallel sweep ----------
         sparsity_dict_list = [None] * len(sparsity_list)  # preserve order
-        max_workers = 1#max(1, os.cpu_count() - 1)  # leave one core free
+        max_workers = pick_worker_count()##max(1, os.cpu_count() - 1)  # leave one core free
 
         with ProcessPoolExecutor(max_workers=max_workers) as exe:
             futures = {exe.submit(_performance_vs_sparsity, e, cfg, m, num_iterations, active_methods): i
@@ -514,15 +506,10 @@ if __name__ == "__main__":
                 sparsity_dict_list[idx] = result
 
         # Save
-    with open("performance_vs_sparsity_5order_10nodes.pkl", "wb") as f:
+    with open("performance_vs_sparsity_5order_10nodes100MC.pkl", "wb") as f:
         pickle.dump(sparsity_dict_list, f)
-
-    # plot_vs_parameter(sparsity_list, sparsity_dict_list, "mse", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="Sparsity [%]")
-    # plot_vs_parameter(sparsity_list, sparsity_dict_list, "eier", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="Sparsity [%]")
-    #
-    #
-    # plot_vs_parameter(sparsity_list, sparsity_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]")
-    # plot_vs_parameter(sparsity_list, sparsity_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]")
+    # plot_vs_parameter(sparsity_list, sparsity_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="mse_vs_sparsity_nonlinear_all")
+    # plot_vs_parameter(sparsity_list, sparsity_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="eier_vs_sparsity_nonlinear_all")
 
     #########################################################################
     ################# - Performance vs. graph sizes  ########################
