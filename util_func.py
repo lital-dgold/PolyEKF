@@ -37,7 +37,7 @@ def pseudo_inv(A, thr=None):
         thr = max(A.shape) * np.finfo(s.dtype).eps * s.max()
 
     # Invert the singular values above the threshold
-    s_inv = np.where(s > thr, 1.0 / s, 0.0)
+    s_inv = np.where(s > (thr * s.max()), 1.0 / s, 0.0)
 
     # Re-compose: V * Σ⁻¹ * Uᵀ   (note: Vt is Vᵀ)
     A_pinv = (Vt.T * s_inv) @ U.T

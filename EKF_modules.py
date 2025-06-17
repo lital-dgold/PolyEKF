@@ -386,11 +386,11 @@ class FastExtendedKalmanFilter(KalmanFilt):
         L = build_L(self.B, self.s)
         # S = H*P*H'+W
         H = compute_Jacobian_poly_dp(L, self.B, q, self.a, self.edges)
-        S = np.dot(H, np.dot(self.Sigma, H.T)) + self.W
+        S = (np.dot(H, np.dot(self.Sigma, H.T)) + np.dot(H, np.dot(self.Sigma, H.T)).T)/2 + self.W
 
         # Calculate the Kalman Gain
         # K = Sigma * H'* inv(H*Sigma*H'+W)
-        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S + np.dot(1e-5, np.eye(S.shape[0]))))
+        K = np.dot(np.dot(self.Sigma, H.T), pseudo_inv(S, 1e-3))
         self.s = (self.s + np.dot(K, (y - compute_poly(L, q, self.a))))
         I = np.eye(H.shape[1])
         self.Sigma = np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K,
@@ -513,29 +513,9 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
         # Concatenate H and the identity matrix vertically
         uncertainty_sigma = self.Sigma # sigma_with_new_connections_uncertainty
         uncertainty_sigma_small = uncertainty_sigma[np.ix_(connections, connections)]
-        S = np.dot(H, np.dot(uncertainty_sigma_small, H.T)) + self.W
+        S = (np.dot(H, np.dot(uncertainty_sigma_small, H.T)) + np.dot(H, np.dot(uncertainty_sigma_small, H.T)).T)/2 + self.W
         # Calculate the Kalman Gain
-        try:
-            K = np.dot(
-                np.dot(uncertainty_sigma_small, H.T),
-                np.linalg.inv(S))# + np.dot(1e-5, np.eye(S.shape[0])))
-            K  = np.dot(np.dot(uncertainty_sigma_small, H.T), pseudo_inv(S, 1.001 * self.W[0,0]))
-        except np.linalg.LinAlgError as e:
-            logging.info("Caught poly_c singular matrix error in EKF update step.")
-            logging.info("Matrix S shape:", S.shape)
-            logging.info("Matrix S rank:", np.linalg.matrix_rank(S))
-            logging.info("Matrix S:\n", S)
-            logging.info("Connections:", connections)
-            logging.info("H.T shape:", H.T.shape)
-            logging.info("Sigma block shape:", uncertainty_sigma_small.shape)
-            traceback.print_exc()  # full traceback for debugging
-            # try:
-            #     K = np.dot(
-            #         np.dot(uncertainty_sigma_small, H.T),
-            #         np.linalg.inv(S + np.dot(1e-3, np.eye(S.shape[0])))
-            #     )
-            # except np.linalg.LinAlgError as e:
-            logging.info("Caught singular matrix error in EKF update step of module oraclKalmanFilt_paper.")
+        K  = np.dot(np.dot(uncertainty_sigma_small, H.T), pseudo_inv(S, 1e-3))
         self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
         I = np.eye(H.shape[1])
         Sigma_small = np.dot(np.dot((I - np.dot(K, H)), uncertainty_sigma_small),
@@ -551,56 +531,6 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
         self.update(q, y, updated_connections)
         self.s = np.maximum(self.s, 0)
         return self.s
-#
-# class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
-#     def __init__(self, F, B, C_u, C_w, C_x, StateInit, poly_c, new_connections_uncertainty_weight):
-#         super(oraclKalmanFilt_paper, self).__init__(F, B, C_u, C_w, C_x, StateInit, poly_c)
-#         self.new_connections_uncertainty_weight = new_connections_uncertainty_weight
-#
-#     def update(self, q, y, connections):
-#         L = build_L(self.B, self.s)
-#         # S = H*P*H'+W
-#         H = compute_Jacobian_poly_dp(L, self.B, q, self.a, self.edges)
-#         H = H[:, connections]
-#         # Concatenate H and the identity matrix vertically
-#         S = np.dot(H, np.dot(self.Sigma[np.ix_(connections, connections)], H.T)) + self.W
-#         # Calculate the Kalman Gain
-#         try:
-#             K = np.dot(
-#                 np.dot(self.Sigma[np.ix_(connections, connections)], H.T),
-#                 np.linalg.inv(S + np.dot(1e-6, np.eye(S.shape[0])))
-#             )
-#         except np.linalg.LinAlgError as e:
-#             logging.info("Caught a singular matrix error in EKF update step.")
-#             logging.info("Matrix S shape:", S.shape)
-#             logging.info("Matrix S rank:", np.linalg.matrix_rank(S))
-#             logging.info("Matrix S:\n", S)
-#             logging.info("Connections:", connections)
-#             logging.info("H.T shape:", H.T.shape)
-#             logging.info("Sigma block shape:", self.Sigma[np.ix_(connections, connections)].shape)
-#             try:
-#                 K = np.dot(
-#                     np.dot(self.Sigma[np.ix_(connections, connections)], H.T),
-#                     np.linalg.inv(S + np.dot(np.max(self.Sigma[np.ix_(connections, connections)]), np.eye(S.shape[0])))
-#                 )
-#             except np.linalg.LinAlgError as e:
-#                 traceback.print_exc()  # full traceback for debugging
-#                 raise  # Re-raise if you want the program to crash after logging        self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
-#         self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
-#         I = np.eye(H.shape[1])
-#         Sigma_small = np.dot(np.dot((I - np.dot(K, H)), self.Sigma[np.ix_(connections, connections)]),
-#                              (I - np.dot(K, H)).T) + np.dot(K, np.dot(self.W, K.T))
-#         self.Sigma = np.zeros_like(self.Sigma)
-#         self.Sigma[np.ix_(connections, connections)] = Sigma_small
-#
-#     def forward(self, q, y, *args):
-#         updated_connections = args[0]
-#         super(oraclKalmanFilt_paper, self).predict()
-#         disconnections = np.setdiff1d(np.arange(self.s.shape[0]), updated_connections)
-#         self.s[disconnections] = 0
-#         self.update(q, y, updated_connections)
-#         self.s = np.maximum(self.s, 0)
-#         return self.s
 
 
 class oraclKalmanFilt_paper_delayed(ExtendedKalmanFilter):
