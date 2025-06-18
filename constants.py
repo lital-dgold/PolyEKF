@@ -117,7 +117,7 @@ METHOD_REGISTRY = {
     "gsp-istap": lambda cfg: sparseKalmanFilterISTA(
         cfg["F"], cfg["B"], cfg["C_u"], cfg["C_w"],
         cfg["C_x_missmatch"], cfg["stateInit_missmatch"],
-        cfg["poly_coefficients"], lambda_1=0.05  # tweak as needed
+        cfg["poly_coefficients"], lambda_1=0.01  # tweak as needed
     ),
 
     # ----- SBL EKF ---------------------------------------

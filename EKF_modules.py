@@ -71,7 +71,8 @@ def state_evolvment(F, state, C_u):
 
 def calc_mse(est, true_state):
     mse = np.dot((est - true_state).T, (est - true_state)) / len(true_state)
-    return mse
+    normalized_mse = mse[0][0] / np.dot(true_state.T, true_state)
+    return mse, normalized_mse
 
 
 def calc_error_in_existing_edges(est, true_state):
@@ -92,7 +93,8 @@ def calc_edge_identification_error_rate_score(est, true_state):
     est_edge_det = set(np.where(est >= 0.1)[0])
     true_edge_det = set(np.where(true_state >= 0.1)[0])
     edge_identification_error = len(est_edge_det.symmetric_difference(true_edge_det))
-    return 100 * edge_identification_error / (2 * len(est))
+    eier = 100 * edge_identification_error / (2 * len(est))
+    return eier, eier/ max((len(est) - len(true_edge_det)), 1)
 
 
 def single_update_iteration(state, F, B, C_w, C_u, N, k):
@@ -718,8 +720,10 @@ def inv_sqrt_singular_matrix(L):
 
 def one_method_evaluation(kf, measurements_q, measurements_y, position, updated_connections_list):
     mse_list = []
+    normalized_mse_list = []
     F1_score_list = []
     EIER_list = []
+    normalized_EIER_list = []
     times_list = []
     for i, (q, y, true_state, updated_connections) in enumerate(
             zip(measurements_q, measurements_y, position, updated_connections_list)):
@@ -727,17 +731,20 @@ def one_method_evaluation(kf, measurements_q, measurements_y, position, updated_
         x_est = kf(q, y, updated_connections)
         end = time.time()
         elapsed = end - start
-        mse = calc_mse(x_est, true_state)
+        mse, normalized_mse = calc_mse(x_est, true_state)
         logging.info(f"Iteration {i}: Execution time = {elapsed:.6f} seconds, mse={mse[0][0]}")
         mse_list.append(mse)
+        normalized_mse_list.append(normalized_mse)
         F1_score_list.append(calc_f1_score(x_est, true_state))
-        EIER_list.append(calc_edge_identification_error_rate_score(x_est, true_state))
+        eier, normaized_eier = calc_edge_identification_error_rate_score(x_est, true_state)
+        EIER_list.append(eier)
+        normalized_EIER_list.append(normaized_eier)
         times_list.append(elapsed)
         if mse[0][0].item() >3:
             aa=3
         x_est_prev = x_est
-    return np.concatenate(mse_list), np.array(F1_score_list).reshape([i + 1, 1]), np.array(EIER_list).reshape(
-        [i + 1, 1]), times_list
+    return np.concatenate(mse_list), np.concatenate(normalized_mse_list), np.array(F1_score_list).reshape([i + 1, 1]), np.array(EIER_list).reshape(
+        [i + 1, 1]), np.array(normalized_EIER_list).reshape([i + 1, 1]), times_list
 
 
 def single_monte_carlo_iteration(F, B, C_u, C_w, C_x_missmatch, C_x, stateInit_missmatch, trajectory_time, stateInit, n,
