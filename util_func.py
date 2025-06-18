@@ -11,6 +11,14 @@ import os, psutil, time, math
 from numpy.linalg import svd
 
 
+def kalman_gain_imp(H, Sigma, W):
+    S = (np.dot(H, np.dot(Sigma, H.T)) + np.dot(H, np.dot(Sigma, H.T)).T) / 2 + W
+    # Calculate the Kalman Gain
+    K = np.dot(np.dot(Sigma, H.T), pseudo_inv(S, 1e-3))
+    I = np.eye(H.shape[1])
+    Sigma = np.dot(np.dot((I - np.dot(K, H)), Sigma), (I - np.dot(K, H)).T) + np.dot(K, np.dot(W, K.T))
+    return S, K, Sigma
+
 def pseudo_inv(A, thr=None):
     """
     Return the Moore–Penrose pseudo-inverse of a matrix A.

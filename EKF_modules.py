@@ -386,16 +386,16 @@ class FastExtendedKalmanFilter(KalmanFilt):
         L = build_L(self.B, self.s)
         # S = H*P*H'+W
         H = compute_Jacobian_poly_dp(L, self.B, q, self.a, self.edges)
-        S = (np.dot(H, np.dot(self.Sigma, H.T)) + np.dot(H, np.dot(self.Sigma, H.T)).T)/2 + self.W
+        S, K, Sigma = kalman_gain_imp(H, self.Sigma, self.W)
+        # S = (np.dot(H, np.dot(self.Sigma, H.T)) + np.dot(H, np.dot(self.Sigma, H.T)).T)/2 + self.W
 
         # Calculate the Kalman Gain
         # K = Sigma * H'* inv(H*Sigma*H'+W)
-        K = np.dot(np.dot(self.Sigma, H.T), pseudo_inv(S, 1e-3))
+        # K = np.dot(np.dot(self.Sigma, H.T), pseudo_inv(S, 1e-3))
         self.s = (self.s + np.dot(K, (y - compute_poly(L, q, self.a))))
-        I = np.eye(H.shape[1])
-        self.Sigma = np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K,
-                                                                                                   np.dot(self.W, K.T))
-
+        # I = np.eye(H.shape[1])
+        # self.Sigma = np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K, np.dot(self.W, K.T))
+        self.Sigma = Sigma
 
 class sparseKalmanFilter(FastExtendedKalmanFilter):
     def __init__(self, F, B, C_u, C_w, C_x, StateInit, poly_c, thr):
@@ -428,35 +428,28 @@ class sparseKalmanFilterISTA(FastExtendedKalmanFilter):
         W_sqrt_inv = np.linalg.inv(sqrtm(self.W))
         Sigma_sqrt_inv = np.linalg.inv(sqrtm(self.Sigma))
         beta = self.lambda_1
-        max_attempts = 10
 
-        for i in range(max_attempts):
-            try:
-                objective = cp.Minimize(
-                    cp.sum_squares(W_sqrt_inv @ (Delta_Y_t - H @ (x - self.s))) +
-                    cp.sum_squares(Sigma_sqrt_inv @ (x - self.s)) +
-                    beta * cp.norm1(x)
-                )
+        objective = cp.Minimize(
+            cp.sum_squares(W_sqrt_inv @ (Delta_Y_t - H @ (x - self.s))) +
+            cp.sum_squares(Sigma_sqrt_inv @ (x - self.s)) +
+            beta * cp.norm1(x)
+        )
 
-                # Define and solve the problem
-                problem = cp.Problem(objective)
-                problem.solve()
-                break  # Exit loop if solve was successful
+        # Define and solve the problem
+        problem = cp.Problem(objective)
+        problem.solve(solver="MOSEK")
 
-            except cp.error.SolverError:
-                beta *= 2  # Increase regularization if solver fails
-                if i == max_attempts - 1:
-                    raise RuntimeError("Optimization failed after multiple attempts.")
 
         # Solution
         self.s = x.value
-        S = np.dot(H, np.dot(self.Sigma, H.T)) + self.W
-
-        # Calculate the Kalman Gain
-        K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S))
-        I = np.eye(H.shape[1])
-        self.Sigma = (
-                np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K, np.dot(self.W, K.T)))
+        S, K, self.Sigma = kalman_gain_imp(H, self.Sigma, self.W)
+        # S = np.dot(H, np.dot(self.Sigma, H.T)) + self.W
+        #
+        # # Calculate the Kalman Gain
+        # K = np.dot(np.dot(self.Sigma, H.T), np.linalg.inv(S))
+        # I = np.eye(H.shape[1])
+        # self.Sigma = (
+        #         np.dot(np.dot((I - np.dot(K, H)), self.Sigma), (I - np.dot(K, H)).T) + np.dot(K, np.dot(self.W, K.T)))
 
     def forward(self, q, y, *args, **kwargs):
         # First perdict next state without observation
@@ -513,13 +506,14 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
         # Concatenate H and the identity matrix vertically
         uncertainty_sigma = self.Sigma # sigma_with_new_connections_uncertainty
         uncertainty_sigma_small = uncertainty_sigma[np.ix_(connections, connections)]
-        S = (np.dot(H, np.dot(uncertainty_sigma_small, H.T)) + np.dot(H, np.dot(uncertainty_sigma_small, H.T)).T)/2 + self.W
+        S, K, Sigma_small = kalman_gain_imp(H, uncertainty_sigma_small, self.W)
+        # S = (np.dot(H, np.dot(uncertainty_sigma_small, H.T)) + np.dot(H, np.dot(uncertainty_sigma_small, H.T)).T)/2 + self.W
         # Calculate the Kalman Gain
-        K  = np.dot(np.dot(uncertainty_sigma_small, H.T), pseudo_inv(S, 1e-3))
+        # K  = np.dot(np.dot(uncertainty_sigma_small, H.T), pseudo_inv(S, 1e-3))
         self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
-        I = np.eye(H.shape[1])
-        Sigma_small = np.dot(np.dot((I - np.dot(K, H)), uncertainty_sigma_small),
-                             (I - np.dot(K, H)).T) + np.dot(K, np.dot(self.W, K.T))
+        # I = np.eye(H.shape[1])
+        # Sigma_small = np.dot(np.dot((I - np.dot(K, H)), uncertainty_sigma_small),
+        #                      (I - np.dot(K, H)).T) + np.dot(K, np.dot(self.W, K.T))
         self.Sigma = np.zeros_like(self.Sigma)
         self.Sigma[np.ix_(connections, connections)] = Sigma_small
 
