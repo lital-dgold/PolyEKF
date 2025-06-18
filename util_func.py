@@ -80,21 +80,43 @@ def stack_across_runs(runs, method):
 def compute_metric_summary(runs, metric, methods_to_plot=None):
     methods_list = methods_to_plot if methods_to_plot is not None else runs[0].keys()
     summary_table = {}
-    for method in runs[0].keys():
-        if method in methods_list:
+    for method in methods_list:
+        if method in runs[0].keys():
             y = aggregate_across_runs(runs, metric, method).mean(axis=0)
             summary_table[method] = y
     return summary_table
 
-def plot_metric(time, runs, metric, methods_to_plot=None, log_format=False, to_save=False, suffix=""):
+LINE_STYLES = ['-', '--', '-.', ':', (0, (3, 1, 1, 1)), (0, (5, 5))]
+LINE_WIDTH = 2.5
+MARKERS = ['o', 's', 'v', '^', 'D', 'x', '*', 'P', 'h', '+']  # extend as needed
+
+def get_line_style(method, method_list=None):
+    if method_list is None:
+        return LINE_STYLES[hash(method) % len(LINE_STYLES)]
+    index = method_list.index(method) % len(LINE_STYLES)
+    return LINE_STYLES[index]
+
+
+def get_marker(method, method_list=None):
+    if method_list is None:
+        return MARKERS[hash(method) % len(MARKERS)]
+    index = method_list.index(method) % len(MARKERS)
+    return MARKERS[index]
+
+
+def plot_metric(time, runs, metric, labels=None, methods_to_plot=None, log_format=False, to_save=False, suffix=""):
     methods_dict = compute_metric_summary(runs, metric, methods_to_plot=methods_to_plot)
     plt.figure()
-    for method in methods_dict.keys():
+    methods_list = list(methods_dict.keys())
+    for method in methods_list:
             y = methods_dict[method]
+            linestyle = get_line_style(method, methods_list)
+            # marker = get_marker(method, methods_list)
+            label = method if labels is None else labels[method]
             if log_format:
-                plt.plot(time, 10 * np.log10(y), label=method)
+                plt.plot(time, 10 * np.log10(y), label=label, linestyle=linestyle, linewidth=LINE_WIDTH)
             else:
-                plt.plot(time, y, label=method)
+                plt.plot(time, y, label=label, linestyle=linestyle, linewidth=LINE_WIDTH)
     plt.xlabel("l [time units]")
     postfix = " [dB]" if log_format else ""
     YLABEL = metric.upper() + postfix
@@ -115,21 +137,25 @@ def unit_func(x):
 def mean_func(table):
     return table.mean(axis=1)
 
-def plot_vs_parameter(parameter_values_list, runs, metric, aggregation_func=unit_func, methods_to_plot=None, log_format=False, x_label1="", to_save=False, suffix=""):
+def plot_vs_parameter(parameter_values_list, runs, metric, aggregation_func=unit_func, labels=None,
+                      methods_to_plot=None, log_format=False, x_label1="", to_save=False, suffix=""):
     mean_metric_along_trajectory = []
     for idx in range(len(parameter_values_list)):
         methods_dict = compute_metric_summary(runs[idx], metric)
         mean_metric_along_trajectory.append(methods_dict)
-    methods_list = methods_to_plot if methods_to_plot is not None else mean_metric_along_trajectory[0].keys()
+    methods_list = methods_to_plot if methods_to_plot is not None else list(mean_metric_along_trajectory[0].keys())
     plt.figure()
-    for method in mean_metric_along_trajectory[0].keys():
-        if method in methods_list:
+    for method in methods_list:
+        if method in mean_metric_along_trajectory[0].keys():
             metric_along_trajectory_vs_parameter = np.stack([r[method] for r in mean_metric_along_trajectory]).squeeze()
             y = aggregation_func(metric_along_trajectory_vs_parameter)
+            linestyle = get_line_style(method, methods_list)
+            marker = get_marker(method, methods_list)
+            label = method if labels is None else labels[method]
             if log_format:
-                plt.plot(parameter_values_list, 10 * np.log10(y), label=method)
+                plt.plot(parameter_values_list, 10 * np.log10(y), label=label, linestyle=linestyle, marker=marker, linewidth=LINE_WIDTH)
             else:
-                plt.plot(parameter_values_list, y, label=method)
+                plt.plot(parameter_values_list, y, label=label, linestyle=linestyle, marker=marker, linewidth=LINE_WIDTH)
     plt.xlabel(x_label1)
     postfix = " [dB]" if log_format else ""
     YLABEL = metric.upper() + postfix
