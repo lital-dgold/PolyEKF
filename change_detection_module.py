@@ -196,7 +196,7 @@ class ChangeDetectionMethod(nn.Module):
         #
         # # Problem definition and solving
         # prob = cp.Problem(objective)
-        solvers = ["MOSEK", "PROXSDP", "CLARABEL", "SCS"]  # order matters
+        solvers = ["MOSEK", "CLARABEL", "SCS"]  # order matters
         for s in solvers:
             try:
                 logging.info(f"Trying solver: {s}")
