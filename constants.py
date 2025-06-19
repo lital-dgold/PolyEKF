@@ -1,7 +1,8 @@
 from EKF_modules import (ExtendedKalmanFilter, FastExtendedKalmanFilter, sparseKalmanFilter, sparseKalmanFilterISTA,
                          oraclKalmanFilt_paper, oraclKalmanFilt_paper_delayed,
-                         oraclKalmanFilt_diagonalovariance_update, oraclKalmanFilt_nocovariance_update)
-from change_detection_module import FastChangeDetectionMethod, ChangeDetectionMethod
+                         oraclKalmanFilt_diagonalovariance_update, oraclKalmanFilt_nocovariance_update,
+                         sparseKalmanFilterISTA_dynamicH)
+from change_detection_module import ChangeDetectionMethod
 
 METHOD_REGISTRY = {
     # ----- Baseline EKF -----------------------------------------------------
@@ -149,13 +150,7 @@ METHOD_REGISTRY = {
     ),
     # ----- Change-detection baseline ---------------------------------------
     "change-det": lambda cfg: ChangeDetectionMethod(
-        cfg["B"], int(0.5*cfg["n"]), cfg["stateInit_missmatch"],
-        cfg["poly_coefficients"], lambda_1=cfg["lambda_1"], lambda_2=cfg["lambda_2"]
-    ),
-
-    # ----- Change-detection baseline ---------------------------------------
-    "change-det-fast": lambda cfg: FastChangeDetectionMethod(
-        cfg["B"], cfg["n"], cfg["stateInit_missmatch"],
+        cfg["B"], cfg["window_len"], cfg["stateInit_missmatch"],
         cfg["poly_coefficients"], lambda_1=cfg["lambda_1"], lambda_2=cfg["lambda_2"]
     ),
 }
