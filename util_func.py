@@ -146,7 +146,7 @@ def mean_func(table):
     return table.mean(axis=1)
 
 def plot_vs_parameter(parameter_values_list, runs, metric, aggregation_func=unit_func, labels=None,
-                      methods_to_plot=None, log_format=False, x_label1="", to_save=False, suffix=""):
+                      methods_to_plot=None, log_format=False, log_x_axis=False, x_label1="", to_save=False, suffix=""):
     mean_metric_along_trajectory = []
     for idx in range(len(parameter_values_list)):
         methods_dict = compute_metric_summary(runs[idx], metric)
@@ -165,6 +165,8 @@ def plot_vs_parameter(parameter_values_list, runs, metric, aggregation_func=unit
             else:
                 plt.plot(parameter_values_list, y, label=label, linestyle=linestyle, marker=marker, linewidth=LINE_WIDTH)
     plt.xlabel(x_label1)
+    if log_x_axis:
+        plt.xscale('log')
     postfix = " [dB]" if log_format else ""
     YLABEL = metric.upper() + postfix
     plt.ylabel(YLABEL)
@@ -285,6 +287,24 @@ def update_performance_vs_time_data(orig_file_name, new_data_file_name, file_nam
         with open(file_name_to_save, "wb") as f:
             pickle.dump(merged_dict_list, f)
         return merged_dict_list
+
+def update_performance_vs_time_data(orig_file_name, new_data_file_name, file_name_to_save):
+    with open(orig_file_name, "rb") as f:
+        orig_data = pickle.load(f)
+    # orig_data = orig_data[1:]
+    with open(new_data_file_name, "rb") as f:
+        new_data = pickle.load(f)
+    new_dict_list1 = []
+    for iter_idx in range(len(new_data)):
+        new_dict = dict()
+        temp = orig_data[iter_idx]
+        del temp["ekf"]
+        new_dict.update(temp)
+        new_dict.update(new_data[iter_idx])
+        new_dict_list1.append(new_dict)
+    with open(file_name_to_save, "wb") as f:
+        pickle.dump(new_dict_list1, f)
+    return new_dict_list1
 
 
 def update_performance_vs_parameter_data(orig_file_name, new_data_file_name, file_name_to_save):
