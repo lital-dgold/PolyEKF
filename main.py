@@ -393,44 +393,42 @@ if __name__ == "__main__":
     # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "eier", aggregation_func=mean_func,
     #                   log_format=False, x_label1="sigma_W [dB]",to_save=True, suffix="eier_vs_snr_nonlinear")
 
-    #########################################################################
-    ############## - Performance vs. rate of graph variations  ##############
-    #########################################################################
-    with simulation("Non-Linear case - Performance vs. graph variation"):
-        num_iterations = 100
-        cfg["window_len"] = int(0.5 * n)
-        poly_coefficients = np.array([0.0, 1.0, 0.8, 0.6, 0.4, 0.2]) #np.array([1.0, 1.0, 1.0, 1.0]) #
-        cfg.update({"poly_coefficients": poly_coefficients})
-        num_time_samples = 79
-        sigma_w = 0.2 ** 0.5
-        trajectory_time = np.arange(0, num_time_samples)
-        cfg.update({"trajectory_time": trajectory_time})
-        C_w_sqrt = np.dot(sigma_w, np.eye(n))
-        cfg.update({"C_w_sqrt": C_w_sqrt})
-        cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
-        C_u_sqrt = np.dot(sigma_v, np.eye(cfg["C_u"].shape[0]))
-        cfg.update({"C_u_sqrt": C_u_sqrt, "C_u": C_u_sqrt @ C_u_sqrt})
-        cfg.update({"num_edges_stateinit": 2 * n})
-        # arr1 = np.array([0.1])
-        k_list = np.geomspace(1, 32, num=6)#np.logspace(-1, 0.5, 8)
-        # k_list = np.concatenate([arr1, arr2])
-        # ---------- parallel sweep ----------
-        k_dict_list = [None] * len(k_list)  # preserve order
-        max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
-
-        with ProcessPoolExecutor(max_workers=max_workers) as exe:
-            futures = {exe.submit(_performance_vs_change_rate, e, cfg, num_iterations, active_methods): i
-                       for i, e in enumerate(k_list)}
-            for fut in as_completed(futures):
-                idx = futures[fut]  # original position
-                _, result = fut.result()  # (num_edges, runs_linear)
-                k_dict_list[idx] = result
-    # Save
-    with open("performance_vs_k_5order_10nodes100MC_order2_scale.pkl", "wb") as f:
-        pickle.dump(k_dict_list, f)
-
-    plot_vs_parameter(k_list, k_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Delta t [xN]", to_save=True, suffix="mse_vs_k_nonlinear_all")
-    plot_vs_parameter(k_list, k_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Delta t [xN]", to_save=True, suffix="eier_vs_k_nonlinear_all")
+    # #########################################################################
+    # ############## - Performance vs. rate of graph variations  ##############
+    # #########################################################################
+    # with simulation("Non-Linear case - Performance vs. graph variation"):
+    #     num_iterations = 100
+    #     cfg["window_len"] = int(0.5 * n)
+    #     poly_coefficients = np.array([0.0, 1.0, 0.8, 0.6, 0.4, 0.2]) #np.array([1.0, 1.0, 1.0, 1.0]) #
+    #     cfg.update({"poly_coefficients": poly_coefficients})
+    #     num_time_samples = 79
+    #     sigma_w = 0.2 ** 0.5
+    #     trajectory_time = np.arange(0, num_time_samples)
+    #     cfg.update({"trajectory_time": trajectory_time})
+    #     C_w_sqrt = np.dot(sigma_w, np.eye(n))
+    #     cfg.update({"C_w_sqrt": C_w_sqrt})
+    #     cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
+    #     C_u_sqrt = np.dot(sigma_v, np.eye(cfg["C_u"].shape[0]))
+    #     cfg.update({"C_u_sqrt": C_u_sqrt, "C_u": C_u_sqrt @ C_u_sqrt})
+    #     cfg.update({"num_edges_stateinit": 2 * n})
+    #     k_list = np.geomspace(1, 32, num=6)#np.logspace(-1, 0.5, 8)
+    #     # ---------- parallel sweep ----------
+    #     k_dict_list = [None] * len(k_list)  # preserve order
+    #     max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
+    #
+    #     with ProcessPoolExecutor(max_workers=max_workers) as exe:
+    #         futures = {exe.submit(_performance_vs_change_rate, e, cfg, num_iterations, active_methods): i
+    #                    for i, e in enumerate(k_list)}
+    #         for fut in as_completed(futures):
+    #             idx = futures[fut]  # original position
+    #             _, result = fut.result()  # (num_edges, runs_linear)
+    #             k_dict_list[idx] = result
+    # # Save
+    # with open("performance_vs_k_5order_10nodes100MC_order2_scale.pkl", "wb") as f:
+    #     pickle.dump(k_dict_list, f)
+    #
+    # plot_vs_parameter(k_list, k_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Delta t [xN]", to_save=True, suffix="mse_vs_k_nonlinear_all")
+    # plot_vs_parameter(k_list, k_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Delta t [xN]", to_save=True, suffix="eier_vs_k_nonlinear_all")
     # #########################################################################
     # ############## - Performance vs. rate of graph variations  ##############
     # #########################################################################
@@ -558,45 +556,45 @@ if __name__ == "__main__":
     # plot_vs_parameter(sparsity_list, dict_list, "mse", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="Sparsity [%]")
     # plot_vs_parameter(sparsity_list, dict_list, "eier", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="Sparsity [%]")
 
-    # #########################################################################
-    # ################# - Run time vs. poly order  ########################
-    # #########################################################################
-    # with simulation("Non-Linear case - Performance vs. poly order"):
-    #     num_iterations = 100
-    #     active_methods = ( "ekf", "gsp-ekf", "oracle-block", "change-det")
-    #     cfg["window_len"] = int(0.5 * n)
-    #     # poly_coefficients = np.array([0.0, 1.0, 0.75, 0.5, 0.25])
-    #     # cfg.update({"poly_coefficients": poly_coefficients})
-    #     num_time_samples = 8 * n -1
-    #     trajectory_time = np.arange(0, num_time_samples)
-    #     cfg.update({"trajectory_time": trajectory_time})
-    #     C_w_sqrt = np.dot(sigma_w, np.eye(n))
-    #     cfg.update({"C_w_sqrt": C_w_sqrt})
-    #     cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
-    #     p_list = np.round(np.linspace(1, n-1, 5)).astype(int)
-    #     # ---------- parallel sweep ----------
-    #     poly_order_dict_list = [None] * len(p_list)  # preserve order
-    #     max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
-    #
-    #     with ProcessPoolExecutor(max_workers=max_workers) as exe:
-    #         futures = {exe.submit(_performance_vs_poly_order, e, cfg, num_iterations, active_methods): i
-    #                    for i, e in enumerate(p_list)}
-    #         for fut in as_completed(futures):
-    #             idx = futures[fut]  # original position
-    #             _, result = fut.result()  # (num_edges, runs_linear)
-    #             poly_order_dict_list[idx] = result
-    #
-    # # Save
-    # with open("performance_vs_poly_order.pkl", "wb") as f:
-    #     pickle.dump(poly_order_dict_list, f)
-    #
-    #
-    # def mean_func(table):
-    #     return table.mean(axis=1)
-    #
-    # plot_vs_parameter(p_list, poly_order_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
-    # plot_vs_parameter(p_list, poly_order_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
-    # plot_vs_parameter(p_list, poly_order_dict_list, "times", aggregation_func=mean_func, log_format=True, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
+    #########################################################################
+    ################# - Run time vs. poly order  ########################
+    #########################################################################
+    with simulation("Non-Linear case - Performance vs. poly order"):
+        num_iterations = 100
+        active_methods = ( "ekf", "gsp-ekf", "oracle-block", "change-det")
+        cfg["window_len"] = int(0.5 * n)
+        # poly_coefficients = np.array([0.0, 1.0, 0.75, 0.5, 0.25])
+        # cfg.update({"poly_coefficients": poly_coefficients})
+        num_time_samples = 79
+        trajectory_time = np.arange(0, num_time_samples)
+        cfg.update({"trajectory_time": trajectory_time})
+        C_w_sqrt = np.dot(sigma_w, np.eye(n))
+        cfg.update({"C_w_sqrt": C_w_sqrt})
+        cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
+        p_list = np.round(np.linspace(1, n-1, 5)).astype(int)
+        # ---------- parallel sweep ----------
+        poly_order_dict_list = [None] * len(p_list)  # preserve order
+        max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
+
+        with ProcessPoolExecutor(max_workers=max_workers) as exe:
+            futures = {exe.submit(_performance_vs_poly_order, e, cfg, num_iterations, active_methods): i
+                       for i, e in enumerate(p_list)}
+            for fut in as_completed(futures):
+                idx = futures[fut]  # original position
+                _, result = fut.result()  # (num_edges, runs_linear)
+                poly_order_dict_list[idx] = result
+
+    # Save
+    with open("performance_vs_poly_order.pkl", "wb") as f:
+        pickle.dump(poly_order_dict_list, f)
+
+
+    def mean_func(table):
+        return table.mean(axis=1)
+
+    plot_vs_parameter(p_list, poly_order_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
+    plot_vs_parameter(p_list, poly_order_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
+    plot_vs_parameter(p_list, poly_order_dict_list, "times", aggregation_func=mean_func, log_format=True, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
 
     a = 5
 
