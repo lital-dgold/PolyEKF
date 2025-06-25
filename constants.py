@@ -1,7 +1,6 @@
 from EKF_modules import (ExtendedKalmanFilter, FastExtendedKalmanFilter, sparseKalmanFilter, sparseKalmanFilterISTA,
                          oraclKalmanFilt_paper, oraclKalmanFilt_paper_delayed,
-                         oraclKalmanFilt_diagonalovariance_update, oraclKalmanFilt_nocovariance_update,
-                         sparseKalmanFilterISTA_dynamicH)
+                         oraclKalmanFilt_diagonalovariance_update, oraclKalmanFilt_nocovariance_update)
 from change_detection_module import ChangeDetectionMethod
 
 METHOD_REGISTRY = {
