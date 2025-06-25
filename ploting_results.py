@@ -25,9 +25,10 @@ if __name__ == "__main__":
     to_plot_non_linear_case_2_vs_time = False#True
     to_plot_non_linear_case_2_vs_snr = False#False
     to_plot_non_linear_case_2_vs_sparsity = False#True
-    to_plot_non_linear_case_2_vs_delta_n = True#False
+    to_plot_non_linear_case_2_vs_delta_n = False#True#False
     to_plot_non_linear_case_2_vs_k = False#True
     to_plot_non_linear_case_2_vs_change_sizes = False
+    to_plot_n10_vs_poly_order = True#False
     num_time_samples = 159
     sigma_v = 0.1
     sigma_w = 0.1
@@ -183,44 +184,18 @@ if __name__ == "__main__":
 
             sparsity_list = np.linspace(10, 50, 5)
 
-            plot_vs_parameter(sparsity_list, sparsity_dict_list, "mse", aggregation_func=mean_func_without_first_n,
-                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="sparsity_5order_without_first_n")
-            plot_vs_parameter(sparsity_list, sparsity_dict_list, "eier", aggregation_func=mean_func_without_first_n,
-                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="sparsity_5order_without_first_n")
+            # plot_vs_parameter(sparsity_list, sparsity_dict_list, "mse", aggregation_func=mean_func_without_first_n,
+            #                   labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="Connected Edges [%]", to_save=True, suffix="sparsity_5order_without_first_n")
+            # plot_vs_parameter(sparsity_list, sparsity_dict_list, "eier", aggregation_func=mean_func_without_first_n,
+            #                   labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="Connected Edges [%]", to_save=True, suffix="sparsity_5order_without_first_n")
 
             plot_vs_parameter(sparsity_list, sparsity_dict_list, "mse", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-                              x_label1="Sparsity [%]", to_save=True, suffix="sparsity_5order_all")
+                              x_label1="Connected Edges [%]", to_save=True, suffix="sparsity_5order_all")
             plot_vs_parameter(sparsity_list, sparsity_dict_list, "eier", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-                              x_label1="Sparsity [%]", to_save=True, suffix="sparsity_5order_all")
+                              x_label1="Connected Edges [%]", to_save=True, suffix="sparsity_5order_all")
 
         except FileNotFoundError:
             print(f"The file {file_name} does not exist.")
-    #########################################################################
-    ############## - Performance vs. size of graph changes  ##############
-    #########################################################################
-    # if to_plot_non_linear_case_2_vs_change_sizes:
-    #     try:
-    #         orig_file_name = "performance_vs_change_size_5order.pkl"
-    #         new_data_file_name = "performance_vs_change_size_5order_oracle.pkl"
-    #         merged_data_file_name = "performance_vs_change_size_5order_merged.pkl"
-    #         # k_dict_list = update_performance_vs_parameter_data(orig_file_name, new_data_file_name,
-    #         #                                                      merged_data_file_name)
-    #         with open(new_data_file_name, "rb") as f:
-    #             delta_n_dict_list = pickle.load(f)
-    #         delta_n_list = np.logspace(-1, 0.5, 8)
-    #
-    #         plot_vs_parameter(10 * np.log10(delta_n_list), delta_n_dict_list, "mse", aggregation_func=mean_func_without_first_n, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-    #                           x_label1="Change Size (xN) [dB]", to_save=True, suffix="change_rate_5order_without_first_n")
-    #         plot_vs_parameter(10 * np.log10(delta_n_list), delta_n_dict_list, "eier", aggregation_func=mean_func_without_first_n, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-    #                           x_label1="Change Size (xN) [dB]", to_save=True, suffix="change_rate_5order_without_first_n")
-    #
-    #         plot_vs_parameter(10 * np.log10(delta_n_list), delta_n_dict_list, "mse", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-    #                           x_label1="Change Size (xN) [dB]", to_save=True, suffix="change_rate_5order_all")
-    #         plot_vs_parameter(10 * np.log10(delta_n_list), delta_n_dict_list, "eier", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-    #                           x_label1="Change Size (xN) [dB]", to_save=True, suffix="change_rate_5order_all")
-    #     except FileNotFoundError:
-    #         print(f"The file {merged_data_file_name} does not exist.")
-    #
 
     #########################################################################
     ############## - Performance vs. rate of graph variations  ##############
@@ -228,20 +203,21 @@ if __name__ == "__main__":
     if to_plot_non_linear_case_2_vs_delta_n:
         try:
             orig_file_name = "performance_vs_change_size_5order_10nodes_046.pkl"
-            new_data_file_name = "performance_vs_change_size_5order_10nodes_new.pkl"#"performance_vs_graph_variation_5order_oracle.pkl"
+            new_data_file_name = "performance_vs_change_size_5order_10nodes_k3n_100MC.pkl"#"performance_vs_graph_variation_5order_oracle.pkl"
             merged_data_file_name = "performance_vs_change_size_5order_10nodes.pkl"
             # k_dict_list = update_performance_vs_parameter_data(orig_file_name, new_data_file_name,
             #                                                      merged_data_file_name)
             with open(new_data_file_name, "rb") as f:
                 delta_n_dict_list = pickle.load(f)
-            delta_n_list = np.logspace(-0.62, 0.3, 4)#np.linspace(1, 5, 5)  # np.logspace(-1, 0.5, 8)
-            plot_vs_parameter(10 * delta_n_list, delta_n_dict_list, "mse", aggregation_func=mean_func,
-                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=True,
-                              x_label1="#connection changes [%]", to_save=True,
+            delta_n_list = np.linspace(1,10,10).astype(int)#np.logspace(-0.62, 0.3, 4)#np.linspace(1, 5, 5)  # np.logspace(-1, 0.5, 8)
+            delta_n_percentage = (100 / m) * delta_n_list
+            plot_vs_parameter(delta_n_percentage, delta_n_dict_list, "mse", aggregation_func=mean_func,
+                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
+                              x_label1="Connection Changes [%]", to_save=True,
                               suffix="connection_change_nonlinear")
-            plot_vs_parameter(10 * delta_n_list, delta_n_dict_list, "eier", aggregation_func=mean_func,
-                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=True,
-                              x_label1="#connection changes [%]", to_save=True,
+            plot_vs_parameter(delta_n_percentage, delta_n_dict_list, "eier", aggregation_func=mean_func,
+                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
+                              x_label1="Connection Changes [%]", to_save=True,
                               suffix="connection_change_nonlinear")
         except FileNotFoundError:
             print(f"The file {merged_data_file_name} does not exist.")
@@ -258,19 +234,44 @@ if __name__ == "__main__":
             #                                                      merged_data_file_name)
             with open(orig_file_name, "rb") as f:
                 k_dict_list = pickle.load(f)
-            k_list = np.logspace(-1, 0.5, 8)
-            n = 10
-            plot_vs_parameter(10 * np.log10(k_list*n), k_dict_list, "mse", aggregation_func=mean_func_without_first_n,
-                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-                              x_label1="Change Rate [dB]", to_save=True, suffix="change_rate_5order_without_first_n")
-            plot_vs_parameter(10 * np.log10(k_list*n), k_dict_list, "eier", aggregation_func=mean_func_without_first_n,
-                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-                              x_label1="Change Rate [dB]", to_save=True, suffix="change_rate_5order_without_first_n")
+            k_list = np.geomspace(1, 32, num=6)  # np.logspace(-1, 0.5, 8)
 
-            plot_vs_parameter(10 * np.log10(k_list*n), k_dict_list, "mse", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-                              x_label1="Change Rate [dB]", to_save=True, suffix="change_rate_5order_all")
-            plot_vs_parameter(10 * np.log10(k_list*n), k_dict_list, "eier", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-                              x_label1="Change Rate [dB]", to_save=True, suffix="change_rate_5order_all")
+
+            plot_vs_parameter(k_list, k_dict_list, "mse", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
+                              x_label1="Change Rate [time units]", log_x_axis=True, to_save=True, suffix="change_rate_5order_all")
+            plot_vs_parameter(k_list, k_dict_list, "eier", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
+                              x_label1="Change Rate [time units]", log_x_axis=True, to_save=True, suffix="change_rate_5order_all")
+        except FileNotFoundError:
+            print(f"The file {merged_data_file_name} does not exist.")
+
+
+    #########################################################################
+    ############## - Performance vs. rate of graph variations  ##############
+    #########################################################################
+    if to_plot_n10_vs_poly_order:
+        try:
+            orig_file_name = "performance_vs_poly_order.pkl"
+            new_data_file_name = "performance_vs_poly_order.pkl"#"performance_vs_graph_variation_5order_oracle.pkl"
+            merged_data_file_name = "performance_vs_poly_order.pkl"
+            with open(merged_data_file_name, "rb") as f:
+                poly_order_dict_list = pickle.load(f)
+            p_list = np.round(np.linspace(1, n-1, 5)).astype(int)
+            plot_vs_parameter(p_list, poly_order_dict_list, "mse", aggregation_func=mean_func,
+                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
+                              x_label1="Polynomial Order [int]", to_save=True,
+                              suffix="n10")
+            plot_vs_parameter(p_list, poly_order_dict_list, "eier", aggregation_func=mean_func,
+                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
+                              x_label1="Polynomial Order [int]", to_save=True,
+                              suffix="n10")
+            plot_vs_parameter(p_list, poly_order_dict_list, "times", aggregation_func=mean_func,
+                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=True, log_x_axis=False,
+                              x_label1="Polynomial Order [int]", to_save=True,
+                              suffix="n10")
+            # plot_vs_parameter(p_list, poly_order_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
+            # plot_vs_parameter(p_list, poly_order_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
+            # plot_vs_parameter(p_list, poly_order_dict_list, "times", aggregation_func=mean_func, log_format=True, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
+
         except FileNotFoundError:
             print(f"The file {merged_data_file_name} does not exist.")
 

@@ -166,7 +166,7 @@ def plot_vs_parameter(parameter_values_list, runs, metric, aggregation_func=unit
                 plt.plot(parameter_values_list, y, label=label, linestyle=linestyle, marker=marker, linewidth=LINE_WIDTH)
     plt.xlabel(x_label1)
     if log_x_axis:
-        plt.xscale('log')
+        plt.xscale('log', base=2)
     postfix = " [dB]" if log_format else ""
     YLABEL = metric.upper() + postfix
     plt.ylabel(YLABEL)
