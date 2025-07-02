@@ -112,7 +112,9 @@ def get_marker(method, method_list=None):
     return MARKERS[index]
 
 
-def plot_metric(time, runs, metric, labels=None, methods_to_plot=None, log_format=False, to_save=False, suffix=""):
+def plot_metric(time, runs, metric, labels=None, methods_to_plot=None, log_format=False, to_save=False, folder_name="",
+                suffix=""):
+    plt.rcParams.update({'font.size': 12})
     methods_dict = compute_metric_summary(runs, metric, methods_to_plot=methods_to_plot)
     plt.figure()
     methods_list = list(methods_dict.keys())
@@ -127,13 +129,15 @@ def plot_metric(time, runs, metric, labels=None, methods_to_plot=None, log_forma
                 plt.plot(time, y, label=label, linestyle=linestyle, linewidth=LINE_WIDTH)
     plt.xlabel("l [time units]")
     postfix = " [dB]" if log_format else ""
-    YLABEL = metric.upper() + postfix
+    prefix = "N" if (metric == "mse") else ""
+    YLABEL = prefix + metric.upper() + postfix
     plt.ylabel(YLABEL)
     plt.xlim(time[0], time[-1])
     plt.grid()
     plt.legend()
     if to_save:
-        plt.savefig(f"{metric}_vs_time_{suffix}.png", format='png')#, bbox_inches='tight', pad_inches=0)
+        full_path = os.path.join(folder_name, f"{metric}_vs_time_{suffix}.png")
+        plt.savefig(full_path, format='png', bbox_inches='tight', pad_inches=0.1)
         plt.close()
     else:
         plt.show()
@@ -146,7 +150,9 @@ def mean_func(table):
     return table.mean(axis=1)
 
 def plot_vs_parameter(parameter_values_list, runs, metric, aggregation_func=unit_func, labels=None,
-                      methods_to_plot=None, log_format=False, log_x_axis=False, x_label1="", to_save=False, suffix=""):
+                      methods_to_plot=None, log_format=False, log_x_axis=False, x_label1="", to_save=False,
+                      folder_name="", suffix=""):
+    plt.rcParams.update({'font.size': 16})
     mean_metric_along_trajectory = []
     for idx in range(len(parameter_values_list)):
         methods_dict = compute_metric_summary(runs[idx], metric)
@@ -168,13 +174,15 @@ def plot_vs_parameter(parameter_values_list, runs, metric, aggregation_func=unit
     if log_x_axis:
         plt.xscale('log', base=2)
     postfix = " [dB]" if log_format else ""
-    YLABEL = metric.upper() + postfix
+    prefix = "N" if (metric == "mse") else ""
+    YLABEL = prefix + metric.upper() + postfix
     plt.ylabel(YLABEL)
     plt.xlim(parameter_values_list[0], parameter_values_list[-1])
     plt.grid()
     plt.legend()
     if to_save:
-        plt.savefig(f"{metric}_vs_{suffix}.png", format='png')#, bbox_inches='tight', pad_inches=0)
+        full_path = os.path.join(folder_name, f"{metric}_vs_{suffix}.png")
+        plt.savefig(full_path, format='png', bbox_inches='tight', pad_inches=0.1)
         plt.close()
     else:
         plt.show()

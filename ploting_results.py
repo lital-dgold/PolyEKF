@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import os
+
 import networkx as nx
 import matplotlib
 import numpy as np
@@ -20,15 +22,15 @@ METHODS_ORDER = ["change-det", "oracle-block", "ekf", "fast-ekf", "gsp-ekf"]
 
 if __name__ == "__main__":
     # Informative flags to control which plots are generated
-    to_plot_linear_case_vs_time = False
-    to_plot_non_linear_case_vs_time = False#True#False
-    to_plot_non_linear_case_2_vs_time = False#True
-    to_plot_non_linear_case_2_vs_snr = False#False
-    to_plot_non_linear_case_2_vs_sparsity = False#True
-    to_plot_non_linear_case_2_vs_delta_n = False#True#False
+    to_plot_linear_case_vs_time = True#True
+    to_plot_non_linear_case_vs_time = True#True#True#False
+    to_plot_non_linear_case_2_vs_time = True#True#True
+    to_plot_non_linear_case_2_vs_snr = False
+    to_plot_non_linear_case_2_vs_sparsity = False#True#True
+    to_plot_non_linear_case_2_vs_delta_n = False#True#True#False
     to_plot_non_linear_case_2_vs_k = False#True
-    to_plot_non_linear_case_2_vs_change_sizes = False
-    to_plot_n10_vs_poly_order = True#False
+    to_plot_non_linear_case_2_vs_change_sizes = False#True
+    to_plot_n10_vs_poly_order = False#True#True#False
     num_time_samples = 159
     sigma_v = 0.1
     sigma_w = 0.1
@@ -85,164 +87,157 @@ if __name__ == "__main__":
     # ------ Linear case -------
     if to_plot_linear_case_vs_time:
         try:
-            file_name = "runs_linear_data1000MC.pkl"
-                # Load
-            with open(file_name, "rb") as f:
+            data_folder_name = "performance_vs_time_linear"
+            data_file_name = "runs_linear_data1000MC.pkl"
+            full_path = os.path.join(data_folder_name, data_file_name)
+            with open(full_path, "rb") as f:
                 runs_linear = pickle.load(f)
+                
             plot_metric(cfg["trajectory_time"], runs_linear, "mse", labels=LABELS, methods_to_plot=METHODS_ORDER,
-                        log_format=True, to_save=True, suffix="linear")
+                        log_format=True, to_save=True, folder_name=data_folder_name, suffix="linear")
             plot_metric(cfg["trajectory_time"], runs_linear, "f1", labels=LABELS, methods_to_plot=METHODS_ORDER,
-                        to_save=True, suffix="linear")
+                        to_save=True, folder_name=data_folder_name, suffix="linear")
             plot_metric(cfg["trajectory_time"], runs_linear, "eier", labels=LABELS, methods_to_plot=METHODS_ORDER,
-                        to_save=True, suffix="linear")
+                        to_save=True, folder_name=data_folder_name, suffix="linear")
             plot_metric(cfg["trajectory_time"], runs_linear, "times", labels=LABELS, methods_to_plot=METHODS_ORDER,
-                        log_format=True, to_save=True, suffix="linear")
+                        log_format=True, to_save=True, folder_name=data_folder_name, suffix="linear")
             linear_table = create_table(runs_linear, "times", methods_to_plot=METHODS_ORDER)
         except FileNotFoundError:
-            print(f"The file {file_name} does not exist.")
+            print(f"The file {full_path} does not exist.")
 
     # ------ Non-Linear case -------
     if to_plot_non_linear_case_vs_time:
         try:
-            # file_name = "runs_nonlinear_data1000MC.pkl"
-            # # Load
-            # with open(file_name, "rb") as f:
-            #     run111 = pickle.load(f)
-            orig_file_name = "runs_nonlinear_data1000MC.pkl"
-            new_data_file_name = "runs_nonlinear_data_fast_ekf.pkl"
-            merged_data_file_name = "runs_nonlinear_data1000MC_merged.pkl"
-            run111 = update_performance_vs_time_data(orig_file_name, new_data_file_name, merged_data_file_name)
+            data_folder_name = "performance_vs_time_nonlinear_case1"
+            data_file_name = "runs_nonlinear_data1000MC_merged.pkl"
+            full_path = os.path.join(data_folder_name, data_file_name)
+            with open(full_path, "rb") as f:
+                run111 = pickle.load(f)
+            # orig_file_name = "runs_nonlinear_data1000MC.pkl"
+            # new_data_file_name = "runs_nonlinear_data_fast_ekf.pkl"
+            # merged_data_file_name = "runs_nonlinear_data1000MC_merged.pkl"
+            # run111 = update_performance_vs_time_data(orig_file_name, new_data_file_name, merged_data_file_name)
             # runs_nonlinear = add_method(("gsp-ekf", "gsp-istap-0.4", "gsp-istap-0.5", "gsp-istap-0.6", "gsp-istap-0.7", "gsp-istap-0.8", "gsp-istap-0.9", "gsp-istap-1", "gsp-istap-1.1", "gsp-istap-1.2", "gsp-istap-1.3", "gsp-istap-1.4"),# "oracle-delayedCov", "oracle-block"),
             #  cfg, runs_nonlinear)
 
             plot_metric(cfg["trajectory_time"], run111,  "mse", labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=True,
-                        to_save=True, suffix="nonlinear_ver1")
+                        to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver1")
             plot_metric(cfg["trajectory_time"], run111, "f1", labels=LABELS, methods_to_plot=METHODS_ORDER,
-                        to_save=True, suffix="nonlinear_ver1")
+                        to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver1")
             plot_metric(cfg["trajectory_time"], run111, "eier", labels=LABELS, methods_to_plot=METHODS_ORDER,
-                        to_save=True, suffix="nonlinear_ver1")
+                        to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver1")
             plot_metric(cfg["trajectory_time"], run111, "times", labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=True,
-                        to_save=True, suffix="nonlinear_ver1")
+                        to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver1")
             nonlinear_table = create_table(run111, "times", methods_to_plot=METHODS_ORDER)
         except FileNotFoundError:
-            print(f"The file {file_name} does not exist.")
+            print(f"The file {full_path} does not exist.")
     #########################################################################
     ######################### - Performance vs. time  #######################
     #########################################################################
     if to_plot_non_linear_case_2_vs_time:
         try:
-            file_name = "runs_nonlinear_data_5order_10nodes_1000MC_results_k2n_all.pkl"
-            # Load
-            with open(file_name, "rb") as f:
+            data_folder_name = "performace_vs_time_nonlinear_ver2"
+            data_file_name = "runs_nonlinear_data_5order_10nodes_1000MC_results_k2n_all.pkl"
+            full_path = os.path.join(data_folder_name, data_file_name)
+            with open(full_path, "rb") as f:
                 non_linear_case_ver2 = pickle.load(f)
             num_time_samples = 79
             trajectory_time = np.arange(0, num_time_samples)
-            plot_metric(trajectory_time, non_linear_case_ver2, "mse", labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=True, to_save=True, suffix="nonlinear_ver2")
-            plot_metric(trajectory_time, non_linear_case_ver2, "f1", to_save=True, suffix="nonlinear_ver2", labels=LABELS, methods_to_plot=METHODS_ORDER)
-            plot_metric(trajectory_time, non_linear_case_ver2, "eier", to_save=True, suffix="nonlinear_ver2", labels=LABELS, methods_to_plot=METHODS_ORDER)
+            plot_metric(trajectory_time, non_linear_case_ver2, "mse", labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=True, to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver2")
+            plot_metric(trajectory_time, non_linear_case_ver2, "f1", to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver2", labels=LABELS, methods_to_plot=METHODS_ORDER)
+            plot_metric(trajectory_time, non_linear_case_ver2, "eier", to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver2", labels=LABELS, methods_to_plot=METHODS_ORDER)
             nonlinear_table = create_table(non_linear_case_ver2, "times", methods_to_plot=METHODS_ORDER)
             print(nonlinear_table)
         except FileNotFoundError:
-            print(f"The file {file_name} does not exist.")
+            print(f"The file {full_path} does not exist.")
     #########################################################################
     ################# - Performance vs. noise level  ########################
     #########################################################################
     if to_plot_non_linear_case_2_vs_snr:
         try:
-            # orig_file_name = "performance_vs_snr_5order_10nodes100MC_oracle.pkl"
-            # sigma_w_list = np.logspace(-2, -0.5, 5)
-            #
-            orig_file_name = "performance_vs_snr_5order_merged.pkl"
-            new_data_file_name = "performance_vs_snr_5order_10nodes100MC_0.011.pkl"
-            merged_data_file_name = "performance_vs_snr_5order_merged111.pkl"
-            snr_dict_list = update_performance_vs_parameter_data(orig_file_name, new_data_file_name, merged_data_file_name)
-            # orig_file_name = "performance_vs_snr_5order_merged.pkl"
-            # with open(orig_file_name, "rb") as f:
-            #     snr_dict_list = pickle.load(f)
-            # sigma_w_list = np.logspace(-1.5, 1.5, 10)
+            data_folder_name = "performance_vs_snr"
+            data_file_name = "performance_vs_snr_5order_merged111.pkl"
+            full_path = os.path.join(data_folder_name, data_file_name)
+            with open(full_path, "rb") as f:
+                snr_dict_list = pickle.load(f)
             sigma_w_list = np.logspace(-2, -0.5, 5)
 
-            # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "mse", aggregation_func=mean_func_without_first_n, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="sigma_W [dB]", to_save=True, suffix="snr_5order_without_first_n", labels=LABELS, methods_to_plot=METHODS_ORDER)
-            # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "eier", aggregation_func=mean_func_without_first_n, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="sigma_W [dB]", to_save=True, suffix="snr_5order_without_first_n", labels=LABELS, methods_to_plot=METHODS_ORDER)
+            # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "mse", aggregation_func=mean_func_without_first_n, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="sigma_W [dB]", to_save=True, folder_name=data_folder_name, suffix="snr_5order_without_first_n", labels=LABELS, methods_to_plot=METHODS_ORDER)
+            # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "eier", aggregation_func=mean_func_without_first_n, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="sigma_W [dB]", to_save=True, folder_name=data_folder_name, suffix="snr_5order_without_first_n", labels=LABELS, methods_to_plot=METHODS_ORDER)
 
-            plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "mse", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=True, x_label1="sigma_W, sigma_U [dB]", to_save=True, suffix="snr_5order_all")
-            plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "eier", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="sigma_W, sigma_U [dB]", to_save=True, suffix="snr_5order_all")
+            plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "mse", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=True, x_label1="sigma_e [dB]", to_save=True, folder_name=data_folder_name, suffix="snr_5order_all")
+            plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "eier", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="sigma_e [dB]", to_save=True, folder_name=data_folder_name, suffix="snr_5order_all")
         except FileNotFoundError:
-            print(f"The file {orig_file_name} does not exist.")
+            print(f"The file {full_path} does not exist.")
     #########################################################################
     ############## - Performance vs. sparsity level  ########################
     #########################################################################
     if to_plot_non_linear_case_2_vs_sparsity:
         try:
-            # orig_file_name = "performance_vs_sparsity_5order_10nodes100MC1.pkl"
-            # new_data_file_name = "performance_vs_sparsity_5order_10nodes100MC.pkl"
-            merged_data_file_name = "performance_vs_sparsity_5order_10nodes100MC_new.pkl"
-            # sparsity_dict_list = update_performance_vs_parameter_data(orig_file_name, new_data_file_name,
-            #                                                      merged_data_file_name)
-            with open(merged_data_file_name, "rb") as f:
+            data_folder_name = "perforamce_vs_sparsity"
+            data_file_name = "performance_vs_sparsity_5order_10nodes100MC_new.pkl"
+            full_path = os.path.join(data_folder_name, data_file_name)
+            with open(full_path, "rb") as f:
                 sparsity_dict_list = pickle.load(f)
 
             sparsity_list = np.linspace(10, 50, 5)
 
             # plot_vs_parameter(sparsity_list, sparsity_dict_list, "mse", aggregation_func=mean_func_without_first_n,
-            #                   labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="Connected Edges [%]", to_save=True, suffix="sparsity_5order_without_first_n")
+            #                   labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="Connected Edges [%]", to_save=True, folder_name=data_folder_name, suffix="sparsity_5order_without_first_n")
             # plot_vs_parameter(sparsity_list, sparsity_dict_list, "eier", aggregation_func=mean_func_without_first_n,
-            #                   labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="Connected Edges [%]", to_save=True, suffix="sparsity_5order_without_first_n")
+            #                   labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, x_label1="Connected Edges [%]", to_save=True, folder_name=data_folder_name, suffix="sparsity_5order_without_first_n")
 
             plot_vs_parameter(sparsity_list, sparsity_dict_list, "mse", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-                              x_label1="Connected Edges [%]", to_save=True, suffix="sparsity_5order_all")
+                              x_label1="Connected Edges [%]", to_save=True, folder_name=data_folder_name, suffix="sparsity_5order_all")
             plot_vs_parameter(sparsity_list, sparsity_dict_list, "eier", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-                              x_label1="Connected Edges [%]", to_save=True, suffix="sparsity_5order_all")
+                              x_label1="Connected Edges [%]", to_save=True, folder_name=data_folder_name, suffix="sparsity_5order_all")
 
         except FileNotFoundError:
-            print(f"The file {file_name} does not exist.")
+            print(f"The file {full_path} does not exist.")
 
     #########################################################################
     ############## - Performance vs. rate of graph variations  ##############
     #########################################################################
     if to_plot_non_linear_case_2_vs_delta_n:
         try:
-            orig_file_name = "performance_vs_change_size_5order_10nodes_046.pkl"
-            new_data_file_name = "performance_vs_change_size_5order_10nodes_k3n_100MC.pkl"#"performance_vs_graph_variation_5order_oracle.pkl"
-            merged_data_file_name = "performance_vs_change_size_5order_10nodes.pkl"
-            # k_dict_list = update_performance_vs_parameter_data(orig_file_name, new_data_file_name,
-            #                                                      merged_data_file_name)
-            with open(new_data_file_name, "rb") as f:
+            data_folder_name = "performance_vs_delta_n"
+            data_file_name = "performance_vs_change_size_5order_10nodes_k3n_100MC.pkl"
+            full_path = os.path.join(data_folder_name, data_file_name)
+            with open(full_path, "rb") as f:
                 delta_n_dict_list = pickle.load(f)
             delta_n_list = np.linspace(1,10,10).astype(int)#np.logspace(-0.62, 0.3, 4)#np.linspace(1, 5, 5)  # np.logspace(-1, 0.5, 8)
+            n=10
+            m = num_possible_edges(n)
             delta_n_percentage = (100 / m) * delta_n_list
             plot_vs_parameter(delta_n_percentage, delta_n_dict_list, "mse", aggregation_func=mean_func,
                               labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
-                              x_label1="Connection Changes [%]", to_save=True,
+                              x_label1="Connection Changes [%]", to_save=True, folder_name=data_folder_name,
                               suffix="connection_change_nonlinear")
             plot_vs_parameter(delta_n_percentage, delta_n_dict_list, "eier", aggregation_func=mean_func,
                               labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
-                              x_label1="Connection Changes [%]", to_save=True,
+                              x_label1="Connection Changes [%]", to_save=True, folder_name=data_folder_name,
                               suffix="connection_change_nonlinear")
         except FileNotFoundError:
-            print(f"The file {merged_data_file_name} does not exist.")
+            print(f"The file {full_path} does not exist.")
 
 #########################################################################
 ############## - Performance vs. rate of graph variations  ##############
 #########################################################################
     if to_plot_non_linear_case_2_vs_k:
         try:
-            orig_file_name = "performance_vs_k_5order_10nodes100MC_new_scale.pkl"
-            new_data_file_name = "performance_vs_k_5order_10nodes100MC_k01.pkl"  # "performance_vs_graph_variation_5order_oracle.pkl"
-            merged_data_file_name = "performance_vs_k_5order_merged.pkl"
-            # k_dict_list = update_performance_vs_parameter_data(orig_file_name, new_data_file_name,
-            #                                                      merged_data_file_name)
-            with open(orig_file_name, "rb") as f:
+            data_folder_name = "performance_vs_k"
+            data_file_name = "performance_vs_k_5order_10nodes100MC_order2_scale_merged.pkl"
+            full_path = os.path.join(data_folder_name, data_file_name)
+            with open(full_path, "rb") as f:
                 k_dict_list = pickle.load(f)
             k_list = np.geomspace(1, 32, num=6)  # np.logspace(-1, 0.5, 8)
 
-
             plot_vs_parameter(k_list, k_dict_list, "mse", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-                              x_label1="Change Rate [time units]", log_x_axis=True, to_save=True, suffix="change_rate_5order_all")
+                              x_label1="Change Rate [time units]", log_x_axis=True, to_save=True, folder_name=data_folder_name, suffix="change_rate_5order_all")
             plot_vs_parameter(k_list, k_dict_list, "eier", aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False,
-                              x_label1="Change Rate [time units]", log_x_axis=True, to_save=True, suffix="change_rate_5order_all")
+                              x_label1="Change Rate [time units]", log_x_axis=True, to_save=True, folder_name=data_folder_name, suffix="change_rate_5order_all")
         except FileNotFoundError:
-            print(f"The file {merged_data_file_name} does not exist.")
+            print(f"The file {full_path} does not exist.")
 
 
     #########################################################################
@@ -250,30 +245,31 @@ if __name__ == "__main__":
     #########################################################################
     if to_plot_n10_vs_poly_order:
         try:
-            orig_file_name = "performance_vs_poly_order.pkl"
-            new_data_file_name = "performance_vs_poly_order.pkl"#"performance_vs_graph_variation_5order_oracle.pkl"
-            merged_data_file_name = "performance_vs_poly_order.pkl"
-            with open(merged_data_file_name, "rb") as f:
+            data_folder_name = "performance_vs_poly_order"
+            data_file_name = "performance_vs_poly_order.pkl"
+            full_path = os.path.join(data_folder_name, data_file_name)
+            with open(full_path, "rb") as f:
                 poly_order_dict_list = pickle.load(f)
+            n = 10
             p_list = np.round(np.linspace(1, n-1, 5)).astype(int)
             plot_vs_parameter(p_list, poly_order_dict_list, "mse", aggregation_func=mean_func,
                               labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
-                              x_label1="Polynomial Order [int]", to_save=True,
+                              x_label1="Polynomial Order [int]", to_save=True, folder_name=data_folder_name,
                               suffix="n10")
             plot_vs_parameter(p_list, poly_order_dict_list, "eier", aggregation_func=mean_func,
                               labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
-                              x_label1="Polynomial Order [int]", to_save=True,
+                              x_label1="Polynomial Order [int]", to_save=True, folder_name=data_folder_name,
                               suffix="n10")
             plot_vs_parameter(p_list, poly_order_dict_list, "times", aggregation_func=mean_func,
                               labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=True, log_x_axis=False,
-                              x_label1="Polynomial Order [int]", to_save=True,
+                              x_label1="Polynomial Order [int]", to_save=True, folder_name=data_folder_name,
                               suffix="n10")
-            # plot_vs_parameter(p_list, poly_order_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
-            # plot_vs_parameter(p_list, poly_order_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
-            # plot_vs_parameter(p_list, poly_order_dict_list, "times", aggregation_func=mean_func, log_format=True, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
+            # plot_vs_parameter(p_list, poly_order_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, folder_name=data_folder_name, suffix="change_rate_5order_all")
+            # plot_vs_parameter(p_list, poly_order_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, folder_name=data_folder_name, suffix="change_rate_5order_all")
+            # plot_vs_parameter(p_list, poly_order_dict_list, "times", aggregation_func=mean_func, log_format=True, x_label1="Sparsity [%]", to_save=True, folder_name=data_folder_name, suffix="change_rate_5order_all")
 
         except FileNotFoundError:
-            print(f"The file {merged_data_file_name} does not exist.")
+            print(f"The file {full_path} does not exist.")
 
 
     a = 5
