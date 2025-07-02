@@ -161,7 +161,7 @@ def evaluate_lambdas(cfg, params):
 
 if __name__ == "__main__":
     data_folder_name = "Results"
-    active_methods = ("fast-ekf", "gsp-ekf", "oracle-block")#, "change-det")
+    active_methods = ("fast-ekf", "gsp-ekf", "oracle-block", "change-det")
     # Informative flags to control which plots are generated
     to_plot_linear_case_vs_time = True  # True
     to_plot_non_linear_case_vs_time = True  # True#True#False
