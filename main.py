@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+import multiprocessing
+from functools import partial
+
 import networkx as nx
 
 import numpy as np
@@ -11,8 +14,11 @@ import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from EKF_modules import get_trajectory, one_method_evaluation, num_possible_edges
-from util_func import vector2diag, compute_metric_summary, pick_worker_count, plot_vs_parameter, mean_func
-from constants import METHOD_REGISTRY
+from util_func import vector2diag, compute_metric_summary, pick_worker_count, plot_vs_parameter, mean_func, plot_metric
+from constants import METHOD_REGISTRY, LABELS, METHODS_ORDER
+from constants import (cfg_linear, cfg_non_linear_case1, cfg_non_linear_case2, cfg_non_linear_vs_snr,
+                       cfg_non_linear_vs_delta_n, cfg_non_linear_vs_k, cfg_non_linear_vs_sparsity,
+                       cfg_non_linear_vs_filter_order)
 
 logging.basicConfig(
     level=logging.INFO,  # Or DEBUG for more detail
@@ -80,39 +86,9 @@ def single_monte_carlo_iteration(cfg, active_methods, iterable):
 
 
 def add_method(list_of_methods, cfg, existing_method_dict):
-    new_runs = run_monte_carlo_simulation(cfg, num_iterations, list_of_methods)
+    new_runs = run_monte_carlo_simulation(cfg, cfg["num_iterations"], list_of_methods)
     new_runs[0].update(existing_method_dict[0])
     return list(new_runs)
-
-
-def _performance_vs_graph_size(n, base_cfg, sigma_x, sigma_v, sigma_w, num_iterations, active_methods):
-    cfg = copy.deepcopy(base_cfg)  # avoid concurrent mutation
-    k = 2 * n  # num of time samples to concat
-    m = num_possible_edges(n)
-    num_edges = 3 * n
-    stateInit_missmatch = np.ones(m).reshape([m, 1])
-    G = nx.complete_graph(n, create_using=None)
-    C_w_sqrt = np.dot(sigma_w, np.eye(n))
-    B = nx.incidence_matrix(G, oriented=True).todense()
-    F = np.dot(1, np.eye(m))
-    C_u = np.dot(sigma_v ** 2, np.eye(m))
-    C_x_missmatch = np.dot(sigma_x ** 2, np.eye(m))
-
-    cfg.update({
-        "F": F,
-        "B": B,
-        "C_u": C_u,
-        "C_w_sqrt": C_w_sqrt,
-        "C_w": C_w_sqrt @ C_w_sqrt,
-        "C_x_missmatch": C_x_missmatch,
-        "stateInit_missmatch": stateInit_missmatch,
-        "num_edges_stateinit": num_edges,
-        "n": n,
-        "k": k,
-        "thr1": thr1,
-        "thr2": thr2,
-    })
-    return n, run_monte_carlo_simulation(cfg, num_iterations, active_methods)
 
 
 def _performance_vs_poly_order(p, base_cfg, num_iterations, active_methods):
@@ -184,421 +160,275 @@ def evaluate_lambdas(cfg, params):
 
 
 if __name__ == "__main__":
-    num_time_samples = 159
-    sigma_v = 0.01 ** 0.5
-    sigma_w = 0.2 ** 0.5
-    sigma_x = 0.5
-    n = 10
-    thr1 = 0.25
-    thr2 = 0.2
-    num_iterations = 1000
-    k = int(2 * n)  # num of time samples to concat
-    m = num_possible_edges(n)
-    num_edges = int(1.5 * n)
-    new_edge_weight = 1
-    # idx_list = chose_indices_without_repeating(m, num_edges)
-    # stateInit = np.zeros(m).reshape([m, 1])
-    # stateInit[idx_list] = new_edge_weight
-    stateInit_missmatch = new_edge_weight * np.ones(m).reshape([m, 1])
-    trajectory_time = np.arange(0, num_time_samples)
-    G = nx.complete_graph(n, create_using=None)
+    data_folder_name = "Results"
+    active_methods = ("fast-ekf", "gsp-ekf", "oracle-block")#, "change-det")
+    # Informative flags to control which plots are generated
+    to_plot_linear_case_vs_time = True  # True
+    to_plot_non_linear_case_vs_time = True  # True#True#False
+    to_plot_non_linear_case_2_vs_time = True  # True#True
+    to_plot_non_linear_case_2_vs_snr = True
+    to_plot_non_linear_case_2_vs_sparsity = True  # True#True
+    to_plot_non_linear_case_2_vs_delta_n = True  # True#True#False
+    to_plot_non_linear_case_2_vs_k = False  # True
+    to_plot_non_linear_case_2_vs_change_sizes = False  # True
+    to_plot_n10_vs_poly_order = False  # True#True#False
+    #########################################################################
+    #################### - Performance vs. time Linear case #################
+    #########################################################################
+    if to_plot_linear_case_vs_time:
+        try:
+            with simulation("Linear case"):
+                with multiprocessing.Pool() as pool:
+                    func = partial(single_monte_carlo_iteration,cfg_linear, active_methods)
+                    runs_linear = pool.map(func, np.arange(cfg_linear["num_iterations"]))
 
-    sparse_flag = False
-    if sparse_flag:
-        C_w_sqrt = sigma_w * sp.identity(n, format="csr", dtype=np.float64)
-        B = nx.incidence_matrix(G, oriented=True).tocsr()
-        F = sp.identity(m, format="csr", dtype=np.float64)
-        C_u_sqrt = (sigma_v) * sp.identity(m, format="csr", dtype=np.float64)
-        # C_x = (sigma_x ** 2) * sp.identity(m, format="csr", dtype=np.float64)
-        C_x_missmatch =(sigma_x ** 2) * sp.identity(m, format="csr", dtype=np.float64)
-    else:
-        C_w_sqrt = np.dot(sigma_w, np.eye(n))
-        B = nx.incidence_matrix(G, oriented=True).todense()
-        F = np.dot(1, np.eye(m))
-        C_u_sqrt  = np.dot(sigma_v, np.eye(m))
-        # C_x = np.dot(sigma_x ** 2, vector2diag(stateInit))
-        C_x_missmatch = np.dot(sigma_x ** 2, np.eye(m))
-    mu = 1
-    #("gsp-ekf05","gsp-ekf1","gsp-ekf15","gsp-ekf2","gsp-ekf25")#
-    active_methods = ( "fast-ekf", "gsp-ekf", "oracle-block", "change-det")
-    # active_methods = ("change-det","change-det-fast",) # "oracle-diag", "oracle-delayedCov", "oracle-nocov",
-                       #"oracle-delayedCov",
-                       # "change-det")
-    cfg = {
-        "F": F,
-        "B": B,
-        "C_u": C_u_sqrt @ C_u_sqrt,
-        "C_u_sqrt": C_u_sqrt,
-        "C_w_sqrt": C_w_sqrt,
-        "C_w": C_w_sqrt @ C_w_sqrt,
-        "C_x_missmatch": C_x_missmatch,
-        "sigma_x": sigma_x,
-        "stateInit_missmatch": stateInit_missmatch,
-        # "stateInit": stateInit,
-        "new_edge_weight": new_edge_weight,
-        "num_edges_stateinit": num_edges,
-        "trajectory_time": trajectory_time,
-        "n": n,
-        "k": k,
-        "thr1": thr1,
-        "thr2": thr2,
-        "mu": mu,
-        "lambda_1": 3.16,
-        "lambda_2": 0.316,
-        "delta_n": max(1, int(0.01 * m)),
-        "window_len": n,
-    }
-    # #########################################################################
-    # ############## - Performance vs. time Linear case  ######################
-    # #########################################################################
-    # with simulation("Linear case"):
-    #     poly_coefficients = np.array([0, 1.0])
-    #     cfg.update({"poly_coefficients": poly_coefficients})
-    #     num_iterations = 1
-    #     runs_linear = run_monte_carlo_simulation(cfg, num_iterations, active_methods)
-    # #
-    #     # with multiprocessing.Pool() as pool:
-    #     #     func = partial(single_monte_carlo_iteration,cfg, active_methods)
-    #     #     runs_linear = pool.map(func, np.arange(num_iterations))
-    #     # runs_linear = run_monte_carlo_simulation(cfg, num_iterations, active_methods)
-    #
-    #     # # Save
-    #     # with open("runs_linear_data.pkl", "wb") as f:
-    #     #     pickle.dump(runs_linear, f)
-    #     #
-    #     # # # Load
-    #     # with open("runs_linear_data.pkl", "rb") as f:
-    #     #     runs_linear_data1000MC = pickle.load(f)
-    #     # # runs_linear = add_method(("change-det-fast",), cfg, runs_linear)
-    #     from util_func import plot_metric, create_table
-    #     plot_metric(cfg["trajectory_time"], runs_linear, "mse", log_format=True, to_save=True,suffix="linear_try")
-    # #     plot_metric(cfg["trajectory_time"], runs_linear, "f1")
-    # #     plot_metric(cfg["trajectory_time"], runs_linear, "eier")
-    #     plot_metric(cfg["trajectory_time"], runs_linear, "times", log_format=True)
-    #     # plot_metric(cfg["trajectory_time"], runs_linear2, "times", log_format=True)
-    #     linear_table = create_table(runs_linear, "times")
-    #     # linear_table2 = create_table(runs_linear2, "times")
-    #
-    # #########################################################################
-    # ############## - Performance vs. time Non-Linear case  ##################
-    # #########################################################################
-    # with simulation("Non-Linear case"):
-    #     poly_coefficients = np.array([1.0, 1.0, 0.1, 1.0])
-    #     cfg.update({"poly_coefficients": poly_coefficients})
-    #     cfg.update({"lambda_1": 0.1})
-    #     cfg.update({"lambda_2": 0})
-    #
-    #     with multiprocessing.Pool() as pool:
-    #         func = partial(single_monte_carlo_iteration,cfg, active_methods)
-    #         runs_nonlinear = pool.map(func, np.arange(num_iterations))
-    #     # runs_nonlinear2 = run_monte_carlo_simulation(cfg, num_iterations, active_methods)
-    #     # Save
-    #     with open("runs_nonlinear_data_fast_ekf.pkl", "wb") as f:
-    #         pickle.dump(runs_nonlinear, f)
-    #
-    #     # # Load
-    #     # with open("runs_nonlinear_data1000MC.pkl", "rb") as f:
-    #     #     run111 = pickle.load(f)
-    #     # # runs_nonlinear = add_method(("gsp-ekf", "gsp-istap-0.4", "gsp-istap-0.5", "gsp-istap-0.6", "gsp-istap-0.7", "gsp-istap-0.8", "gsp-istap-0.9", "gsp-istap-1", "gsp-istap-1.1", "gsp-istap-1.2", "gsp-istap-1.3", "gsp-istap-1.4"),# "oracle-delayedCov", "oracle-block"),
-    #     # #  cfg, runs_nonlinear)
-    #
-    #     plot_metric(cfg["trajectory_time"], runs_nonlinear, "mse", log_format=True, to_save=True, suffix="nonlinear_ver1")    #     plot_metric(cfg["trajectory_time"], runs_nonlinear, "f1")
-    #     plot_metric(cfg["trajectory_time"], runs_nonlinear, "eier")
-    #     plot_metric(cfg["trajectory_time"], runs_nonlinear, "times", log_format=True)
-    #     # plot_metric(cfg["trajectory_time"], runs_nonlinear2, "times", log_format=True)
-    #     nonlinear_table = create_table(runs_nonlinear, "times")
-    #     # nonlinear_table2 = create_table(runs_nonlinear2, "times")
+                # Save
+                linear_file_name = "runs_linear_data.pkl"
+                full_path = os.path.join(data_folder_name, linear_file_name)
+                with open(full_path, "wb") as f:
+                    pickle.dump(runs_linear, f)
+
+            plot_metric(cfg_linear["trajectory_time"], runs_linear, "mse", labels=LABELS, methods_to_plot=METHODS_ORDER,
+                        log_format=True, to_save=True, folder_name=data_folder_name, suffix="linear")
+            plot_metric(cfg_linear["trajectory_time"], runs_linear, "f1", labels=LABELS, methods_to_plot=METHODS_ORDER,
+                        to_save=True, folder_name=data_folder_name, suffix="linear")
+            plot_metric(cfg_linear["trajectory_time"], runs_linear, "eier", labels=LABELS, methods_to_plot=METHODS_ORDER,
+                        to_save=True, folder_name=data_folder_name, suffix="linear")
+            plot_metric(cfg_linear["trajectory_time"], runs_linear, "times", labels=LABELS, methods_to_plot=METHODS_ORDER,
+                        log_format=True, to_save=True, folder_name=data_folder_name, suffix="linear")
+        except FileNotFoundError:
+            print(f"The file {full_path} does not exist.")
+    #########################################################################
+    ############## - Performance vs. time Non-Linear case 1 #################
+    #########################################################################
+    if to_plot_non_linear_case_vs_time:
+        try:
+            with simulation("Non-Linear case"):
+                with multiprocessing.Pool() as pool:
+                    func = partial(single_monte_carlo_iteration, cfg_non_linear_case1, active_methods)
+                    runs_nonlinear = pool.map(func, np.arange(cfg_non_linear_case1["num_iterations"]))
+                # Save
+                runs_nonlinear_data_fast_ekf_file_name = "runs_nonlinear_data_fast_ekf.pkl"
+                full_path = os.path.join(data_folder_name, runs_nonlinear_data_fast_ekf_file_name)
+                with open(full_path, "wb") as f:
+                    pickle.dump(runs_nonlinear, f)
+
+            plot_metric(cfg_non_linear_case1["trajectory_time"], runs_nonlinear,  "mse", labels=LABELS,
+                        methods_to_plot=METHODS_ORDER, log_format=True,
+                        to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver1")
+            plot_metric(cfg_non_linear_case1["trajectory_time"], runs_nonlinear, "f1", labels=LABELS,
+                        methods_to_plot=METHODS_ORDER,
+                        to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver1")
+            plot_metric(cfg_non_linear_case1["trajectory_time"], runs_nonlinear, "eier", labels=LABELS,
+                        methods_to_plot=METHODS_ORDER,
+                        to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver1")
+            plot_metric(cfg_non_linear_case1["trajectory_time"], runs_nonlinear, "times", labels=LABELS,
+                        methods_to_plot=METHODS_ORDER, log_format=True,
+                        to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver1")
+        except FileNotFoundError:
+            print(f"The file {full_path} does not exist.")
+    #########################################################################
+    ############## - Performance vs. time - Non-Linear case 2 ###############
+    #########################################################################
+    if to_plot_non_linear_case_2_vs_time:
+        try:
+            with simulation("Non-Linear case"):
+                with multiprocessing.Pool() as pool:
+                    func = partial(single_monte_carlo_iteration, cfg_non_linear_case2, active_methods)
+                    non_linear_case_ver2 = pool.map(func, np.arange(cfg_non_linear_case2["num_iterations"]))
+                # Save
+                runs_nonlinear_data_5order_10nodes_1000MC_results_k2n_all_file_name = "runs_nonlinear_data_5order_10nodes_1000MC_results_k2n_all.pkl"
+                full_path = os.path.join(data_folder_name, runs_nonlinear_data_5order_10nodes_1000MC_results_k2n_all_file_name)
+                with open(full_path, "wb") as f:
+                    pickle.dump(non_linear_case_ver2, f)
+
+            plot_metric(cfg_non_linear_case2["trajectory_time"], non_linear_case_ver2, "mse", labels=LABELS,
+                        methods_to_plot=METHODS_ORDER, log_format=True, to_save=True, folder_name=data_folder_name,
+                        suffix="nonlinear_ver2")
+            plot_metric(cfg_non_linear_case2["trajectory_time"], non_linear_case_ver2, "f1", labels=LABELS,
+                        methods_to_plot=METHODS_ORDER, to_save=True, folder_name=data_folder_name,
+                        suffix="nonlinear_ver2")
+            plot_metric(cfg_non_linear_case2["trajectory_time"], non_linear_case_ver2, "eier", labels=LABELS,
+                        methods_to_plot=METHODS_ORDER, to_save=True, folder_name=data_folder_name,
+                        suffix="nonlinear_ver2")
+        except FileNotFoundError:
+            print(f"The file {full_path} does not exist.")
+    #########################################################################
+    ################# - Performance vs. noise level  ########################
+    #########################################################################
+    if to_plot_non_linear_case_2_vs_snr:
+        try:
+            with simulation("Non-Linear case - Performance vs. noise level"):
+                snr_dict_list = [None] * len(cfg_non_linear_vs_snr["sigma_w_list"])  # preserve order
+                max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
+
+                with ProcessPoolExecutor(max_workers=max_workers) as exe:
+                    futures = {exe.submit(_performance_vs_snr, e, cfg_non_linear_vs_snr, cfg_non_linear_vs_snr["n"],
+                                          cfg_non_linear_vs_snr["num_iterations"], active_methods): i
+                               for i, e in enumerate(cfg_non_linear_vs_snr["sigma_w_list"])}
+                    for fut in as_completed(futures):
+                        idx = futures[fut]  # original position
+                        _, result = fut.result()  # (num_edges, runs_linear)
+                        snr_dict_list[idx] = result
+            # Save
+            performance_vs_snr_5order_10nodes100MC_file_name = "performance_vs_snr_5order_10nodes100MC.pkl"
+            full_path = os.path.join(data_folder_name, runs_nonlinear_data_fast_ekf_file_name)
+            with open(full_path, "wb") as f:
+                pickle.dump(snr_dict_list, f)
+            plot_vs_parameter(10 * np.log10(cfg_non_linear_vs_snr["sigma_w_list"]), snr_dict_list, "mse",
+                              aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER,
+                              log_format=True, x_label1="sigma_e [dB]", to_save=True, folder_name=data_folder_name,
+                              suffix="snr_5order_all")
+            plot_vs_parameter(10 * np.log10(cfg_non_linear_vs_snr["sigma_w_list"]), snr_dict_list, "eier",
+                              aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER,
+                              log_format=False, x_label1="sigma_e [dB]", to_save=True, folder_name=data_folder_name,
+                              suffix="snr_5order_all")
+        except FileNotFoundError:
+            print(f"The file {full_path} does not exist.")
+    #########################################################################
+    ############## - Performance vs. rate of graph variations  ##############
+    #########################################################################
+    if to_plot_non_linear_case_2_vs_delta_n:
+        try:
+            with simulation("Non-Linear case - Performance vs. graph variation"):
+                delta_n_dict_list = [None] * len(cfg_non_linear_vs_delta_n["delta_n_list"])  # preserve order
+                max_workers = pick_worker_count()  # max(1, os.cpu_count() - 1)  # leave one core free
+
+                with ProcessPoolExecutor(max_workers=max_workers) as exe:
+                    futures = {exe.submit(_performance_vs_change_size, e, cfg_non_linear_vs_delta_n,
+                                          cfg_non_linear_vs_delta_n["num_iterations"], active_methods): i
+                               for i, e in enumerate(cfg_non_linear_vs_delta_n["delta_n_list"])}
+                    for fut in as_completed(futures):
+                        idx = futures[fut]  # original position
+                        _, result = fut.result()  # (num_edges, runs_linear)
+                        delta_n_dict_list[idx] = result
+            # Save
+            performance_vs_change_size_5order_10nodes_k3n_100MC_file_name = "performance_vs_change_size_5order_10nodes_k3n_100MC.pkl"
+            full_path = os.path.join(data_folder_name, performance_vs_change_size_5order_10nodes_k3n_100MC_file_name)
+            with open(full_path, "wb") as f:
+                pickle.dump(delta_n_dict_list, f)
+
+            delta_n_percentage = (100 / cfg_non_linear_vs_delta_n["m"]) * cfg_non_linear_vs_delta_n["delta_n_list"]
+            plot_vs_parameter(delta_n_percentage, delta_n_dict_list, "mse", aggregation_func=mean_func,
+                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
+                              x_label1="Connection Changes [%]", to_save=True, folder_name=data_folder_name,
+                              suffix="connection_change_nonlinear")
+            plot_vs_parameter(delta_n_percentage, delta_n_dict_list, "eier", aggregation_func=mean_func,
+                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
+                              x_label1="Connection Changes [%]", to_save=True, folder_name=data_folder_name,
+                              suffix="connection_change_nonlinear")
+        except FileNotFoundError:
+            print(f"The file {full_path} does not exist.")
 
     #########################################################################
-    ######################### - Tuning parameters  #######################
+    ############## - Performance vs. rate of graph variations  ##############
     #########################################################################
-    # with simulation("Tuning parameters"):
-    #     sigma_w = 0.2 ** 0.5
-    #     poly_coefficients =  np.array([0.0, 1.0, 0.8, 0.6, 0.4, 0.2])#np.array([1.0, 1.0, 0.1, 1.0])
-    #     cfg.update({"poly_coefficients": poly_coefficients})
-        # lambda_1_values = np.logspace(-1, 2, 5)  # e.g., [0.1, 1, 10, 100]
-        # lambda_2_values = np.logspace(-2, 1, 5)  # e.g., [0.01, 0.1, 1, 10]
-        # grid = list(itertools.product(lambda_1_values, lambda_2_values))
-        #
-        # results = [evaluate_lambdas(cfg, params) for params in grid]
+    if to_plot_non_linear_case_2_vs_k:
+        try:
+            with simulation("Non-Linear case - Performance vs. graph variation"):
+                k_dict_list = [None] * len(cfg_non_linear_vs_k["k_list"])  # preserve order
+                max_workers = pick_worker_count()  # max(1, os.cpu_count() - 1)  # leave one core free
 
-        # # 'results' now contains one entry per grid point, in the same order as 'grid'
-        #
-        # with open("tuning_change_det.pkl", "wb") as f:
-        #     pickle.dump(results, f)
-        # # Find best
-        # best_lambda = min(results, key=lambda x: x[2])
-        # print(f"Best: lambda_1={best_lambda[0]}, lambda_2={best_lambda[1]}, avg_error={best_lambda[2]}")
-        #
-        # cfg.update({"lambda_1": best_lambda[0]})
-        # cfg.update({"lambda_2": best_lambda[1]})
-        # results = run_monte_carlo_simulation(cfg, num_iterations, active_methods)
+                with ProcessPoolExecutor(max_workers=max_workers) as exe:
+                    futures = {exe.submit(_performance_vs_change_rate, e, cfg_non_linear_vs_k, cfg_non_linear_vs_k["num_iterations"], active_methods): i
+                               for i, e in enumerate(cfg_non_linear_vs_k["k_list"])}
+                    for fut in as_completed(futures):
+                        idx = futures[fut]  # original position
+                        _, result = fut.result()  # (num_edges, runs_linear)
+                        k_dict_list[idx] = result
+            # Save
+            performance_vs_k_5order_10nodes100MC_order2_scale_file_name = "performance_vs_k_5order_10nodes100MC_order2_scale.pkl"
+            full_path = os.path.join(data_folder_name,
+                                     performance_vs_k_5order_10nodes100MC_order2_scale_file_name)
+            with open(full_path, "wb") as f:
+                pickle.dump(k_dict_list, f)
 
-    # #########################################################################
-    # ######################### - Performance vs. time  #######################
-    # #########################################################################
-    # with simulation("Non-Linear case"):
-    #     num_iterations = 1000
-    #     n=10
-    #     num_time_samples = 79
-    #     trajectory_time = np.arange(0, num_time_samples)
-    #     poly_coefficients =  np.array([0.0, 1.0, 0.8, 0.6, 0.4, 0.2])#np.array([1.0, 1.0, 0.1, 1.0])
-    #     cfg.update({"poly_coefficients": poly_coefficients, "trajectory_time":trajectory_time})
-    #     cfg["window_len"] = int(0.5 * n)
-    #     with multiprocessing.Pool() as pool:
-    #         func = partial(single_monte_carlo_iteration,cfg, active_methods)
-    #         runs_nonlinear_5order = pool.map(func, np.arange(num_iterations))
-    #
-    #     # Save
-    #     with open("runs_nonlinear_data_5order_10nodes_1000MC_results_k2n_all.pkl", "wb") as f:
-    #         pickle.dump(runs_nonlinear_5order, f)
-    #     from util_func import plot_metric, create_table
-    #
-    #     plot_metric(cfg["trajectory_time"], runs_nonlinear_5order, "mse", log_format=True, to_save=True, suffix="10nodes_1000mc_nonlinear")
-    #     plot_metric(cfg["trajectory_time"], runs_nonlinear_5order, "eier",  to_save=True, suffix="10nodes_1000mc_nonlinear")
-    # #########################################################################
-    # ################# - Performance vs. noise level  ########################
-    # #########################################################################
-    # with simulation("Non-Linear case - Performance vs. noise level"):
-    #     num_iterations = 100
-    #     poly_coefficients = np.array([0.0, 1.0, 0.8, 0.6, 0.4, 0.2]) #np.array([1.0, 1.0, 1.0, 1.0]) #
-    #     cfg.update({"poly_coefficients": poly_coefficients})
-    #     cfg["window_len"] = int(0.5 * n)
-    #     num_time_samples = 79
-    #     trajectory_time = np.arange(0, num_time_samples)
-    #     cfg.update({"trajectory_time": trajectory_time})
-    #     sigma_w_list = np.logspace(-2, -0.5, 5)
-    #     # ---------- parallel sweep ----------
-    #     snr_dict_list = [None] * len(sigma_w_list)  # preserve order
-    #     max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
-    #
-    #     with ProcessPoolExecutor(max_workers=max_workers) as exe:
-    #         futures = {exe.submit(_performance_vs_snr, e, cfg, n, num_iterations, active_methods): i
-    #                    for i, e in enumerate(sigma_w_list)}
-    #         for fut in as_completed(futures):
-    #             idx = futures[fut]  # original position
-    #             _, result = fut.result()  # (num_edges, runs_linear)
-    #             snr_dict_list[idx] = result
-    #
-    #
-    # # Save
-    # file_name = "performance_vs_snr_5order_10nodes100MC.pkl"
-    # with open(file_name, "wb") as f:
-    #     pickle.dump(snr_dict_list, f)
-    # # with open(file_name, "rb") as f:
-    # #     snr_dict_list = pickle.load(f)
-    #
-    # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "mse", aggregation_func=mean_func,
-    #                   log_format=True, x_label1="sigma_W [dB]", to_save=True, suffix="mse_vs_snr_nonlinear")
-    # plot_vs_parameter(10 * np.log10(sigma_w_list), snr_dict_list, "eier", aggregation_func=mean_func,
-    #                   log_format=False, x_label1="sigma_W [dB]",to_save=True, suffix="eier_vs_snr_nonlinear")
+            plot_vs_parameter(cfg_non_linear_vs_k["k_list"], k_dict_list, "mse", aggregation_func=mean_func, labels=LABELS,
+                              methods_to_plot=METHODS_ORDER, log_format=False,
+                              x_label1="Change Rate [time units]", log_x_axis=True, to_save=True,
+                              folder_name=data_folder_name, suffix="change_rate_5order_all")
+            plot_vs_parameter(cfg_non_linear_vs_k["k_list"], k_dict_list, "eier", aggregation_func=mean_func, labels=LABELS,
+                              methods_to_plot=METHODS_ORDER, log_format=False,
+                              x_label1="Change Rate [time units]", log_x_axis=True, to_save=True,
+                              folder_name=data_folder_name, suffix="change_rate_5order_all")
+        except FileNotFoundError:
+            print(f"The file {full_path} does not exist.")
+    ########################################################################
+    ############# - Performance vs. sparsity level  ########################
+    ########################################################################
+    if to_plot_non_linear_case_2_vs_sparsity:
+        try:
+            with simulation("Non-Linear case - Performance vs. sparsity level"):
+                sparsity_dict_list = [None] * len(cfg_non_linear_vs_sparsity["sparsity_list"])  # preserve order
+                max_workers = pick_worker_count()  ##max(1, os.cpu_count() - 1)  # leave one core free
 
-    # #########################################################################
-    # ############## - Performance vs. rate of graph variations  ##############
-    # #########################################################################
-    # with simulation("Non-Linear case - Performance vs. graph variation"):
-    #     num_iterations = 100
-    #     cfg["window_len"] = int(0.5 * n)
-    #     poly_coefficients = np.array([0.0, 1.0, 0.8, 0.6, 0.4, 0.2]) #np.array([1.0, 1.0, 1.0, 1.0]) #
-    #     cfg.update({"poly_coefficients": poly_coefficients})
-    #     num_time_samples = 79
-    #     sigma_w = 0.2 ** 0.5
-    #     trajectory_time = np.arange(0, num_time_samples)
-    #     cfg.update({"trajectory_time": trajectory_time})
-    #     C_w_sqrt = np.dot(sigma_w, np.eye(n))
-    #     cfg.update({"C_w_sqrt": C_w_sqrt})
-    #     cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
-    #     C_u_sqrt = np.dot(sigma_v, np.eye(cfg["C_u"].shape[0]))
-    #     cfg.update({"C_u_sqrt": C_u_sqrt, "C_u": C_u_sqrt @ C_u_sqrt})
-    #     cfg.update({"num_edges_stateinit": 2 * n})
-    #     k_list = np.geomspace(1, 32, num=6)#np.logspace(-1, 0.5, 8)
-    #     # ---------- parallel sweep ----------
-    #     k_dict_list = [None] * len(k_list)  # preserve order
-    #     max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
-    #
-    #     with ProcessPoolExecutor(max_workers=max_workers) as exe:
-    #         futures = {exe.submit(_performance_vs_change_rate, e, cfg, num_iterations, active_methods): i
-    #                    for i, e in enumerate(k_list)}
-    #         for fut in as_completed(futures):
-    #             idx = futures[fut]  # original position
-    #             _, result = fut.result()  # (num_edges, runs_linear)
-    #             k_dict_list[idx] = result
-    # # Save
-    # with open("performance_vs_k_5order_10nodes100MC_order2_scale.pkl", "wb") as f:
-    #     pickle.dump(k_dict_list, f)
-    #
-    # plot_vs_parameter(k_list, k_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Delta t [xN]", to_save=True, suffix="mse_vs_k_nonlinear_all")
-    # plot_vs_parameter(k_list, k_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Delta t [xN]", to_save=True, suffix="eier_vs_k_nonlinear_all")
-    # #########################################################################
-    # ############## - Performance vs. rate of graph variations  ##############
-    # #########################################################################
-    # with simulation("Non-Linear case - Performance vs. graph variation"):
-    #     num_iterations = 100
-    #     # poly_coefficients = np.array([1.0, 1.0, 0.1, 1.0])
-    #     poly_coefficients = np.array([0.0, 1.0, 0.8, 0.6, 0.4, 0.2])
-    #     cfg.update({"poly_coefficients": poly_coefficients})
-    #     # cfg.update({"lambda_1": 0.1})
-    #     # cfg.update({"lambda_2": 0})
-    #     cfg["window_len"] = int(0.5 * n)
-    #
-    #     num_time_samples = 79
-    #     trajectory_time = np.arange(0, num_time_samples)
-    #     cfg.update({"trajectory_time": trajectory_time})
-    #     # c = np.linspace(1, 1 / n, n)  # start=1, stop=1/n, n points
-    #     C_w_sqrt = np.dot(sigma_w, np.eye(n))  # scipy.linalg.toeplitz(c)#
-    #     cfg.update({"C_w_sqrt": C_w_sqrt})
-    #     cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
-    #     C_u_sqrt = np.dot(0.01 ** 0.5, np.eye(m))
-    #     cfg.update({"C_u": C_u_sqrt @ C_u_sqrt, "C_u_sqrt": C_u_sqrt})
-    #     cfg.update({"k": 2 * n})
-    #     delta_n_list = np.linspace(1,10,10).astype(int)#(0.46,)#np.logspace(-2, 0.3, 6)#np.logspace(-1, 0.5, 8)
-    #     delta_n_percentage_list = 100 * delta_n_list / m
-    #     num_edges = int(1.5 * n)
-    #     # k = int(2 * n)  # num of time samples to concat
-    #     cfg.update({"k": 3 * n, "num_edges_stateinit": num_edges})
-    #     # ---------- parallel sweep ----------
-    #     delta_n_dict_list = [None] * len(delta_n_list)  # preserve order
-    #     max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
-    #
-    #     with ProcessPoolExecutor(max_workers=max_workers) as exe:
-    #         futures = {exe.submit(_performance_vs_change_size, e, cfg, num_iterations, active_methods): i
-    #                    for i, e in enumerate(delta_n_list)}
-    #         for fut in as_completed(futures):
-    #             idx = futures[fut]  # original position
-    #             _, result = fut.result()  # (num_edges, runs_linear)
-    #             delta_n_dict_list[idx] = result
-    # # Save
-    # with open("performance_vs_change_size_5order_10nodes_k3n_100MC.pkl", "wb") as f:
-    #     pickle.dump(delta_n_dict_list, f)
-    #
-    #
-    # plot_vs_parameter(delta_n_percentage_list, delta_n_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="#connection changes [%]", to_save=True, suffix="mse_vs_connection_change_nonlinear_all")
-    # plot_vs_parameter(delta_n_percentage_list, delta_n_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="#connection changes [%]", to_save=True, suffix="eier_vs_connection_change_nonlinear_all")
+                with ProcessPoolExecutor(max_workers=max_workers) as exe:
+                    futures = {exe.submit(_performance_vs_sparsity, e, cfg_non_linear_vs_sparsity,
+                                          cfg_non_linear_vs_sparsity["m"], cfg_non_linear_vs_sparsity["num_iterations"],
+                                          active_methods): i
+                               for i, e in enumerate(cfg_non_linear_vs_sparsity["sparsity_list"])}
+                    for fut in as_completed(futures):
+                        idx = futures[fut]  # original position
+                        _, result = fut.result()  # (num_edges, runs_linear)
+                        sparsity_dict_list[idx] = result
 
-    # ########################################################################
-    # ############# - Performance vs. sparsity level  ########################
-    # ########################################################################
-    # with simulation("Non-Linear case - Performance vs. sparsity level"):
-    #     num_iterations = 100
-    #     sigma_w = 0.2 ** 0.5
-    #     poly_coefficients = np.array(
-    #         [0.0, 1.0, 0.8, 0.6, 0.4, 0.2])  # np.array([0.0, 1.0, 0.75, 0.5, 0.25])##np.array([1.0, 1.0, 1.0, 1.0])#
-    #     cfg.update({"poly_coefficients": poly_coefficients})
-    #     num_time_samples = 79
-    #     trajectory_time = np.arange(0, num_time_samples)
-    #     cfg.update({"trajectory_time": trajectory_time})
-    #     c = np.linspace(1, 1 / n, n)  # start=1, stop=1/n, n points
-    #     C_w_sqrt = np.dot(sigma_w, np.eye(n))  # scipy.linalg.toeplitz(c)#
-    #     cfg.update({"C_w_sqrt": C_w_sqrt})
-    #     cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
-    #     C_u_sqrt = np.dot(0.05 ** 0.5, np.eye(m))
-    #     cfg.update({"C_u": C_u_sqrt @ C_u_sqrt, "C_u_sqrt": C_u_sqrt})
-    #     sparsity_list = np.linspace(10, 50, 5)
-    #     cfg.update({"k": 2 * n})
-    #     # ---------- parallel sweep ----------
-    #     sparsity_dict_list = [None] * len(sparsity_list)  # preserve order
-    #     max_workers = pick_worker_count()##max(1, os.cpu_count() - 1)  # leave one core free
-    #
-    #     with ProcessPoolExecutor(max_workers=max_workers) as exe:
-    #         futures = {exe.submit(_performance_vs_sparsity, e, cfg, m, num_iterations, active_methods): i
-    #                    for i, e in enumerate(sparsity_list)}
-    #         for fut in as_completed(futures):
-    #             idx = futures[fut]  # original position
-    #             _, result = fut.result()  # (num_edges, runs_linear)
-    #             sparsity_dict_list[idx] = result
-    #
-    #     # Save
-    # with open("performance_vs_sparsity_5order_10nodes100MC_new.pkl", "wb") as f:
-    #     pickle.dump(sparsity_dict_list, f)
-    # def mean_func_without_first_n(table):
-    #     return table[:, n:].mean(axis=1)
-    # plot_vs_parameter(sparsity_list, sparsity_dict_list, "mse", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="mse_vs_sparsity_nonlinear_all")
-    # plot_vs_parameter(sparsity_list, sparsity_dict_list, "normalized_mse", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="eier_vs_sparsity_nonlinear_all")
-    # plot_vs_parameter(sparsity_list, sparsity_dict_list, "normalized_eier", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="eier_vs_sparsity_nonlinear_all")
+            # Save
+            performance_vs_sparsity_5order_10nodes100MC_new_file_name = "performance_vs_sparsity_5order_10nodes100MC_new.pkl"
+            full_path = os.path.join(data_folder_name,
+                                     performance_vs_sparsity_5order_10nodes100MC_new_file_name)
+            with open(full_path, "wb") as f:
+                pickle.dump(sparsity_dict_list, f)
 
+            plot_vs_parameter(cfg_non_linear_vs_sparsity["sparsity_list"], sparsity_dict_list, "mse",
+                              aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER,
+                              log_format=False, x_label1="Connected Edges [%]", to_save=True,
+                              folder_name=data_folder_name, suffix="sparsity_5order_all")
+            plot_vs_parameter(cfg_non_linear_vs_sparsity["sparsity_list"], sparsity_dict_list, "eier",
+                              aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER,
+                              log_format=False, x_label1="Connected Edges [%]", to_save=True,
+                              folder_name=data_folder_name, suffix="sparsity_5order_all")
+
+        except FileNotFoundError:
+            print(f"The file {full_path} does not exist.")
     #########################################################################
-    ################# - Performance vs. graph sizes  ########################
+    ########################### - Run time vs. poly order  ##################
     #########################################################################
-    # with simulation("Non-Linear case - Performance vs. graph sizes"):
-    #     num_iterations = 1
-    #     # poly_coefficients = np.array([0.0, 1.0, 0.75, 0.5, 0.25])
-    #     # cfg.update({"poly_coefficients": poly_coefficients})
-    #     num_time_samples = 79
-    #     trajectory_time = np.arange(0, num_time_samples)
-    #     cfg.update({"trajectory_time": trajectory_time})
-    #     C_w_sqrt = np.dot(sigma_w, np.eye(n))
-    #     cfg.update({"C_w_sqrt": C_w_sqrt})
-    #     cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
-    #     n_list = np.round(np.logspace(10, 1000, 8)).astype(int)
-    #     dict_list = []
-    #
-    #
-    #     # ---------- parallel sweep ----------
-    #     dict_list = [None] * len(n_list)  # preserve order
-    #     max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
-    #
-    #     with ProcessPoolExecutor(max_workers=max_workers) as exe:
-    #         futures = {exe.submit(_performance_vs_graph_size, e, cfg, n, cfg, sigma_x, sigma_v, sigma_w, num_iterations, active_methods): i
-    #                    for i, e in enumerate(n_list)}
-    #         for fut in as_completed(futures):
-    #             idx = futures[fut]  # original position
-    #             _, result = fut.result()  # (num_edges, runs_linear)
-    #             dict_list[idx] = result
-    #
-    # # Save
-    # with open("performance_vs_graph_sizes.pkl", "wb") as f:
-    #     pickle.dump(dict_list, f)
-    #
-    #
-    # def mean_func(table):
-    #     return table.mean(axis=1)
-    #
-    # plot_vs_parameter(sparsity_list, dict_list, "mse", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="Sparsity [%]")
-    # plot_vs_parameter(sparsity_list, dict_list, "eier", aggregation_func=mean_func_without_first_n, log_format=False, x_label1="Sparsity [%]")
+    if to_plot_n10_vs_poly_order:
+        try:
+            with simulation("Non-Linear case - Performance vs. poly order"):
+                poly_order_dict_list = [None] * len(cfg_non_linear_vs_filter_order["p_list"])  # preserve order
+                max_workers = pick_worker_count()  # max(1, os.cpu_count() - 1)  # leave one core free
 
-    #########################################################################
-    ################# - Run time vs. poly order  ########################
-    #########################################################################
-    with simulation("Non-Linear case - Performance vs. poly order"):
-        num_iterations = 100
-        active_methods = ( "ekf", "gsp-ekf", "oracle-block", "change-det")
-        cfg["window_len"] = int(0.5 * n)
-        # poly_coefficients = np.array([0.0, 1.0, 0.75, 0.5, 0.25])
-        # cfg.update({"poly_coefficients": poly_coefficients})
-        num_time_samples = 79
-        trajectory_time = np.arange(0, num_time_samples)
-        cfg.update({"trajectory_time": trajectory_time})
-        C_w_sqrt = np.dot(sigma_w, np.eye(n))
-        cfg.update({"C_w_sqrt": C_w_sqrt})
-        cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
-        p_list = np.round(np.linspace(1, n-1, 5)).astype(int)
-        # ---------- parallel sweep ----------
-        poly_order_dict_list = [None] * len(p_list)  # preserve order
-        max_workers = pick_worker_count()#max(1, os.cpu_count() - 1)  # leave one core free
+                with ProcessPoolExecutor(max_workers=max_workers) as exe:
+                    futures = {exe.submit(_performance_vs_poly_order, e, cfg_non_linear_vs_filter_order,
+                                          cfg_non_linear_vs_filter_order["num_iterations"], active_methods): i
+                               for i, e in enumerate(cfg_non_linear_vs_filter_order["p_list"])}
+                    for fut in as_completed(futures):
+                        idx = futures[fut]  # original position
+                        _, result = fut.result()  # (num_edges, runs_linear)
+                        poly_order_dict_list[idx] = result
 
-        with ProcessPoolExecutor(max_workers=max_workers) as exe:
-            futures = {exe.submit(_performance_vs_poly_order, e, cfg, num_iterations, active_methods): i
-                       for i, e in enumerate(p_list)}
-            for fut in as_completed(futures):
-                idx = futures[fut]  # original position
-                _, result = fut.result()  # (num_edges, runs_linear)
-                poly_order_dict_list[idx] = result
+            # Save
+            performance_vs_poly_order_file_name = "performance_vs_poly_order.pkl"
+            full_path = os.path.join(data_folder_name,
+                                     performance_vs_poly_order_file_name)
+            with open(full_path, "wb") as f:
+                pickle.dump(poly_order_dict_list, f)
 
-    # Save
-    with open("performance_vs_poly_order.pkl", "wb") as f:
-        pickle.dump(poly_order_dict_list, f)
+            plot_vs_parameter(cfg_non_linear_vs_filter_order["p_list"], poly_order_dict_list, "mse", aggregation_func=mean_func,
+                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
+                              x_label1="Polynomial Order [int]", to_save=True, folder_name=data_folder_name,
+                              suffix="n10")
+            plot_vs_parameter(cfg_non_linear_vs_filter_order["p_list"], poly_order_dict_list, "eier", aggregation_func=mean_func,
+                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=False, log_x_axis=False,
+                              x_label1="Polynomial Order [int]", to_save=True, folder_name=data_folder_name,
+                              suffix="n10")
+            plot_vs_parameter(cfg_non_linear_vs_filter_order["p_list"], poly_order_dict_list, "times", aggregation_func=mean_func,
+                              labels=LABELS, methods_to_plot=METHODS_ORDER, log_format=True, log_x_axis=False,
+                              x_label1="Polynomial Order [int]", to_save=True, folder_name=data_folder_name,
+                              suffix="n10")
 
-
-    def mean_func(table):
-        return table.mean(axis=1)
-
-    plot_vs_parameter(p_list, poly_order_dict_list, "mse", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
-    plot_vs_parameter(p_list, poly_order_dict_list, "eier", aggregation_func=mean_func, log_format=False, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
-    plot_vs_parameter(p_list, poly_order_dict_list, "times", aggregation_func=mean_func, log_format=True, x_label1="Sparsity [%]", to_save=True, suffix="change_rate_5order_all")
+        except FileNotFoundError:
+            print(f"The file {full_path} does not exist.")
 
     a = 5
-
-
-
-
-
