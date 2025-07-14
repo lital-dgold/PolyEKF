@@ -16,14 +16,15 @@ The proposed method formulates the problem of topology tracking as a sparse nonl
 
 
 ## 📂 Repository Structure
-| File                             | Description                                                                                                                                                       |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `main.py`                        | Entry point for simulations. Runs Monte Carlo experiments for various scenarios (e.g., different noise levels, sparsity, etc.) and generates performance metrics. |
-| `EKF_modules.py`                 | Contains implementations of the core tracking algorithms, including the proposed sparsity-aware EKF, Oracle-GSP-EKF, EKF and evaluation logic.                    |
-| `change_detection_module.py`     | Implements the baseline graph change detection method from [1] using convex optimization with $\ell_1$ and nuclear norm regularization.                           |
-| `constants.py`                   | Defines global configurations for different experimental setups (e.g., linear vs nonlinear, varying sparsity, SNR, etc.).                                         |
-| `util_func.py`                   | Utility functions for computing metrics, generating plots, dynamic parallelization setup, and Jacobian evaluations.                                               |
-| `ploting_results.py`             | Generates evaluation plots (e.g., MSE, F1-score) from saved simulation data.                                                                                      |
+
+| File                           | Description                                                                                                                                                        |
+|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `main.py`                     | Entry point for running Monte Carlo simulations and performance evaluation across various experimental setups (e.g., noise, sparsity, topology dynamics).         |
+| `EKF_modules.py`              | Contains the implementation of filtering algorithms: standard EKF, fast EKF, sparsity-aware EKF (thresholding and ISTA-based), and Oracle-aided EKF variants.     |
+| `change_detection_module.py`  | Implements the baseline convex graph change detection method from [1] with $\ell_1$ and nuclear norm regularization using CVXPY.                                          |
+| `constants.py`                | Defines experimental configurations (linear and nonlinear cases) and maps method names to filtering modules via `METHOD_REGISTRY`.                                 |
+| `util_func.py`                | Provides utility functions for Jacobian computation, polynomial filtering, simulation, Kalman gain, trajectory generation, evaluation metrics, and parallel setup.  |
+| `ploting_results.py`          | Generates and saves performance plots (MSE, F1-score, EIER, runtime) across configurations and scenarios; handles merged and saved result data.                   |
 
 
 ## 📘 Citation
