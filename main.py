@@ -13,8 +13,8 @@ import copy
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from EKF_modules import get_trajectory, one_method_evaluation, num_possible_edges
-from util_func import vector2diag, compute_metric_summary, pick_worker_count, plot_vs_parameter, mean_func, plot_metric
+from util_func import (vector2diag, compute_metric_summary, pick_worker_count, plot_vs_parameter, mean_func, plot_metric,
+                       one_method_evaluation, get_trajectory)
 from constants import METHOD_REGISTRY, LABELS, METHODS_ORDER
 from constants import (cfg_linear, cfg_non_linear_case1, cfg_non_linear_case2, cfg_non_linear_vs_snr,
                        cfg_non_linear_vs_delta_n, cfg_non_linear_vs_k, cfg_non_linear_vs_sparsity,

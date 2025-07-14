@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib
 import time,logging
 
-from torch.backends.mkl import verbose
+# from torch.backends.mkl import verbose
 
 matplotlib.use('TkAgg')  # or 'Agg', 'Qt5Agg', etc. depending on your setup
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -17,9 +17,7 @@ import numpy as np
 from numpy.linalg import solve
 import scipy.sparse as sp
 import numpy as np
-from scipy.linalg import cholesky
-from scipy.optimize import nnls
-import cvxpy as cp
+
 import scipy.sparse as sp
 from util_func import *
 import cvxpy as cp
