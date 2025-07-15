@@ -3,7 +3,8 @@
 
 This repository contains the official implementation of the Sparsity-Aware Extended Kalman Filter (GSP-EKF) for tracking dynamic graph topologies, as proposed in the paper:
 
-📄 L.Dabush, N. Shlezinger, and T. Routtenberg, ``Sparsity-Aware Extended Kalman Filter for Tracking Dynamic Graphs".
+📄 [L. Dabush, N. Shlezinger, and T. Routtenberg, "Sparsity-Aware Extended Kalman Filter for Tracking Dynamic Graphs"](http://arxiv.org/abs/2507.09999)
+
 
 ## 🧠 Overview
 
