@@ -18,7 +18,15 @@ from util_func import (vector2diag, compute_metric_summary, pick_worker_count, p
 from constants import METHOD_REGISTRY, LABELS, METHODS_ORDER
 from constants import (cfg_linear, cfg_non_linear_case1, cfg_non_linear_case2, cfg_non_linear_vs_snr,
                        cfg_non_linear_vs_delta_n, cfg_non_linear_vs_k, cfg_non_linear_vs_sparsity,
-                       cfg_non_linear_vs_filter_order)
+                       cfg_non_linear_vs_filter_order,
+                       cfg_linear_vs_thr, cfg_non_linear_case1_vs_thr, cfg_non_linear_case2_vs_thr)
+from constants import (RESULTS_DIR,
+                       FILE_LINEAR_VS_TIME, FILE_NONLINEAR_CASE1_VS_TIME, FILE_NONLINEAR_CASE2_VS_TIME,
+                       FILE_NONLINEAR_CASE2_VS_SNR, FILE_NONLINEAR_CASE2_VS_DELTA_N,
+                       FILE_NONLINEAR_CASE2_VS_K, FILE_NONLINEAR_CASE2_VS_SPARSITY,
+                       FILE_N10_VS_POLY_ORDER,
+                       FOLDER_PERFORMANCE_VS_THR, FILE_LINEAR_VS_THR,
+                       FILE_NONLINEAR_CASE1_VS_THR, FILE_NONLINEAR_CASE2_VS_THR)
 
 logging.basicConfig(
     level=logging.INFO,  # Or DEBUG for more detail
@@ -108,7 +116,7 @@ def _performance_vs_snr(sigma_w1,base_cfg, n, num_iterations, active_methods):
     cfg.update({"C_w_sqrt": C_w_sqrt})
     cfg.update({"C_w": C_w_sqrt @ C_w_sqrt})
     sigma_v = sigma_w1
-    C_u_sqrt = np.dot(sigma_v, np.eye(cfg["C_u_sqrt"].shape[0]))
+    C_u_sqrt = np.dot(sigma_v, np.eye(cfg["m"]))
     cfg.update({"C_u_sqrt": C_u_sqrt})
     cfg.update({"C_u": C_u_sqrt @ C_u_sqrt})
     return sigma_w1, run_monte_carlo_simulation(cfg, num_iterations, active_methods)
@@ -118,10 +126,6 @@ def _performance_vs_change_size(delta_n, base_cfg, num_iterations, active_method
     cfg = copy.deepcopy(base_cfg)  # avoid concurrent mutation
     logging.info(f"change rate={delta_n} * n %\n")
     cfg.update({"delta_n": delta_n})
-    if delta_n > 6:
-        cfg.update({"thr1": 0.1})
-    elif delta_n > 3:
-        cfg.update({"thr1": 0.15})
     return delta_n, run_monte_carlo_simulation(cfg, num_iterations, active_methods)
 
 
@@ -129,8 +133,6 @@ def _performance_vs_change_rate(k, base_cfg, num_iterations, active_methods):
     cfg = copy.deepcopy(base_cfg)  # avoid concurrent mutation
     logging.info(f"change rate={k} %\n")
     cfg.update({"k": int(k)})
-    if k < 4:
-        cfg.update({"thr1": 0.1})
     return k, run_monte_carlo_simulation(cfg, num_iterations, active_methods)
 
 def _performance_vs_sparsity(num_edges, base_cfg, m, num_iterations, active_methods):
@@ -143,6 +145,35 @@ def _performance_vs_sparsity(num_edges, base_cfg, m, num_iterations, active_meth
     logging.info(f"sparsity={num_edges}%")  # this log is process-local
     return num_edges, run_monte_carlo_simulation(cfg, num_iterations, active_methods)
 
+def _performance_vs_thr(thr, base_cfg, num_iterations, active_methods):
+    cfg = copy.deepcopy(base_cfg)
+    logging.info(f"thr={thr}")
+    cfg.update({"thr1": thr})
+    return thr, run_monte_carlo_simulation(cfg, num_iterations, active_methods)
+
+
+def _run_vs_thr(cfg_vs_thr, folder, file_path, suffix):
+    thr_dict_list = [None] * len(cfg_vs_thr["thr_list"])
+    max_workers = pick_worker_count()
+    with ProcessPoolExecutor(max_workers=max_workers) as exe:
+        futures = {exe.submit(_performance_vs_thr, e, cfg_vs_thr,
+                              cfg_vs_thr["num_iterations"], active_methods): i
+                   for i, e in enumerate(cfg_vs_thr["thr_list"])}
+        for fut in as_completed(futures):
+            idx = futures[fut]
+            _, result = fut.result()
+            thr_dict_list[idx] = result
+    os.makedirs(folder, exist_ok=True)
+    with open(file_path, "wb") as f:
+        pickle.dump(thr_dict_list, f)
+    for metric in ("mse", "eier"):
+        plot_vs_parameter(cfg_vs_thr["thr_list"], thr_dict_list, metric,
+                          aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER,
+                          log_format=False, log_x_axis=False,
+                          x_label1="Threshold", to_save=True,
+                              folder_name=folder, suffix=suffix)
+
+
 # Define the evaluation function
 def evaluate_lambdas(cfg, params):
     num_iterations = 2
@@ -152,7 +183,7 @@ def evaluate_lambdas(cfg, params):
     try:
         result = run_monte_carlo_simulation(local_cfg, num_iterations, ("change-det",))
         methods_dict = compute_metric_summary(result, "mse", methods_to_plot= ("change-det",))
-        avg_error = methods_dict[ "change-det"].mean()  # update key as needed
+        avg_error = methods_dict[ "change-det"].mean(axis=0).mean()  # update key as needed
         return (lambda_1, lambda_2, avg_error)
     except Exception as e:
         print(f"Failed for lambda_1={lambda_1}, lambda_2={lambda_2}: {e}")
@@ -160,18 +191,21 @@ def evaluate_lambdas(cfg, params):
 
 
 if __name__ == "__main__":
-    data_folder_name = "Results"
-    active_methods = ("fast-ekf", "gsp-ekf", "oracle-block", "change-det")
+    data_folder_name = RESULTS_DIR
+    active_methods = ("prob_ssm", "gsp-ekf", "oracle-block", "change-det", "fast-ekf", "grls")#
     # Informative flags to control which plots are generated
-    to_plot_linear_case_vs_time = True  # True
-    to_plot_non_linear_case_vs_time = True  # True#True#False
-    to_plot_non_linear_case_2_vs_time = True  # True#True
-    to_plot_non_linear_case_2_vs_snr = True
-    to_plot_non_linear_case_2_vs_sparsity = True  # True#True
-    to_plot_non_linear_case_2_vs_delta_n = True  # True#True#False
-    to_plot_non_linear_case_2_vs_k = False  # True
-    to_plot_non_linear_case_2_vs_change_sizes = False  # True
-    to_plot_n10_vs_poly_order = False  # True#True#False
+    to_plot_linear_case_vs_time = False
+    to_plot_non_linear_case_vs_time = False#
+    to_plot_non_linear_case_2_vs_time = False
+    to_plot_non_linear_case_2_vs_snr = False
+    to_plot_non_linear_case_2_vs_sparsity = False
+    to_plot_non_linear_case_2_vs_delta_n = False
+    to_plot_non_linear_case_2_vs_k = False
+    # to_plot_non_linear_case_2_vs_change_sizes = False
+    to_plot_n10_vs_poly_order = True
+    to_plot_linear_vs_thr = False
+    to_plot_non_linear_case1_vs_thr = False
+    to_plot_non_linear_case2_vs_thr = False
     #########################################################################
     #################### - Performance vs. time Linear case #################
     #########################################################################
@@ -183,9 +217,7 @@ if __name__ == "__main__":
                     runs_linear = pool.map(func, np.arange(cfg_linear["num_iterations"]))
 
                 # Save
-                linear_file_name = "runs_linear_data.pkl"
-                full_path = os.path.join(data_folder_name, linear_file_name)
-                with open(full_path, "wb") as f:
+                with open(FILE_LINEAR_VS_TIME, "wb") as f:
                     pickle.dump(runs_linear, f)
 
             plot_metric(cfg_linear["trajectory_time"], runs_linear, "mse", labels=LABELS, methods_to_plot=METHODS_ORDER,
@@ -197,7 +229,7 @@ if __name__ == "__main__":
             plot_metric(cfg_linear["trajectory_time"], runs_linear, "times", labels=LABELS, methods_to_plot=METHODS_ORDER,
                         log_format=True, to_save=True, folder_name=data_folder_name, suffix="linear")
         except FileNotFoundError:
-            print(f"The file {full_path} does not exist.")
+            print(f"The file {FILE_LINEAR_VS_TIME} does not exist.")
     #########################################################################
     ############## - Performance vs. time Non-Linear case 1 #################
     #########################################################################
@@ -208,9 +240,7 @@ if __name__ == "__main__":
                     func = partial(single_monte_carlo_iteration, cfg_non_linear_case1, active_methods)
                     runs_nonlinear = pool.map(func, np.arange(cfg_non_linear_case1["num_iterations"]))
                 # Save
-                runs_nonlinear_data_fast_ekf_file_name = "runs_nonlinear_data_fast_ekf.pkl"
-                full_path = os.path.join(data_folder_name, runs_nonlinear_data_fast_ekf_file_name)
-                with open(full_path, "wb") as f:
+                with open(FILE_NONLINEAR_CASE1_VS_TIME, "wb") as f:
                     pickle.dump(runs_nonlinear, f)
 
             plot_metric(cfg_non_linear_case1["trajectory_time"], runs_nonlinear,  "mse", labels=LABELS,
@@ -226,7 +256,7 @@ if __name__ == "__main__":
                         methods_to_plot=METHODS_ORDER, log_format=True,
                         to_save=True, folder_name=data_folder_name, suffix="nonlinear_ver1")
         except FileNotFoundError:
-            print(f"The file {full_path} does not exist.")
+            print(f"The file {FILE_NONLINEAR_CASE1_VS_TIME} does not exist.")
     #########################################################################
     ############## - Performance vs. time - Non-Linear case 2 ###############
     #########################################################################
@@ -237,9 +267,7 @@ if __name__ == "__main__":
                     func = partial(single_monte_carlo_iteration, cfg_non_linear_case2, active_methods)
                     non_linear_case_ver2 = pool.map(func, np.arange(cfg_non_linear_case2["num_iterations"]))
                 # Save
-                runs_nonlinear_data_5order_10nodes_1000MC_results_k2n_all_file_name = "runs_nonlinear_data_5order_10nodes_1000MC_results_k2n_all.pkl"
-                full_path = os.path.join(data_folder_name, runs_nonlinear_data_5order_10nodes_1000MC_results_k2n_all_file_name)
-                with open(full_path, "wb") as f:
+                with open(FILE_NONLINEAR_CASE2_VS_TIME, "wb") as f:
                     pickle.dump(non_linear_case_ver2, f)
 
             plot_metric(cfg_non_linear_case2["trajectory_time"], non_linear_case_ver2, "mse", labels=LABELS,
@@ -252,7 +280,7 @@ if __name__ == "__main__":
                         methods_to_plot=METHODS_ORDER, to_save=True, folder_name=data_folder_name,
                         suffix="nonlinear_ver2")
         except FileNotFoundError:
-            print(f"The file {full_path} does not exist.")
+            print(f"The file {FILE_NONLINEAR_CASE2_VS_TIME} does not exist.")
     #########################################################################
     ################# - Performance vs. noise level  ########################
     #########################################################################
@@ -271,9 +299,7 @@ if __name__ == "__main__":
                         _, result = fut.result()  # (num_edges, runs_linear)
                         snr_dict_list[idx] = result
             # Save
-            performance_vs_snr_5order_10nodes100MC_file_name = "performance_vs_snr_5order_10nodes100MC.pkl"
-            full_path = os.path.join(data_folder_name, runs_nonlinear_data_fast_ekf_file_name)
-            with open(full_path, "wb") as f:
+            with open(FILE_NONLINEAR_CASE2_VS_SNR, "wb") as f:
                 pickle.dump(snr_dict_list, f)
             plot_vs_parameter(10 * np.log10(cfg_non_linear_vs_snr["sigma_w_list"]), snr_dict_list, "mse",
                               aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER,
@@ -284,7 +310,7 @@ if __name__ == "__main__":
                               log_format=False, x_label1="sigma_e [dB]", to_save=True, folder_name=data_folder_name,
                               suffix="snr_5order_all")
         except FileNotFoundError:
-            print(f"The file {full_path} does not exist.")
+            print(f"The file {FILE_NONLINEAR_CASE2_VS_SNR} does not exist.")
     #########################################################################
     ############## - Performance vs. rate of graph variations  ##############
     #########################################################################
@@ -303,9 +329,7 @@ if __name__ == "__main__":
                         _, result = fut.result()  # (num_edges, runs_linear)
                         delta_n_dict_list[idx] = result
             # Save
-            performance_vs_change_size_5order_10nodes_k3n_100MC_file_name = "performance_vs_change_size_5order_10nodes_k3n_100MC.pkl"
-            full_path = os.path.join(data_folder_name, performance_vs_change_size_5order_10nodes_k3n_100MC_file_name)
-            with open(full_path, "wb") as f:
+            with open(FILE_NONLINEAR_CASE2_VS_DELTA_N, "wb") as f:
                 pickle.dump(delta_n_dict_list, f)
 
             delta_n_percentage = (100 / cfg_non_linear_vs_delta_n["m"]) * cfg_non_linear_vs_delta_n["delta_n_list"]
@@ -318,7 +342,7 @@ if __name__ == "__main__":
                               x_label1="Connection Changes [%]", to_save=True, folder_name=data_folder_name,
                               suffix="connection_change_nonlinear")
         except FileNotFoundError:
-            print(f"The file {full_path} does not exist.")
+            print(f"The file {FILE_NONLINEAR_CASE2_VS_DELTA_N} does not exist.")
 
     #########################################################################
     ############## - Performance vs. rate of graph variations  ##############
@@ -337,10 +361,7 @@ if __name__ == "__main__":
                         _, result = fut.result()  # (num_edges, runs_linear)
                         k_dict_list[idx] = result
             # Save
-            performance_vs_k_5order_10nodes100MC_order2_scale_file_name = "performance_vs_k_5order_10nodes100MC_order2_scale.pkl"
-            full_path = os.path.join(data_folder_name,
-                                     performance_vs_k_5order_10nodes100MC_order2_scale_file_name)
-            with open(full_path, "wb") as f:
+            with open(FILE_NONLINEAR_CASE2_VS_K, "wb") as f:
                 pickle.dump(k_dict_list, f)
 
             plot_vs_parameter(cfg_non_linear_vs_k["k_list"], k_dict_list, "mse", aggregation_func=mean_func, labels=LABELS,
@@ -352,7 +373,7 @@ if __name__ == "__main__":
                               x_label1="Change Rate [time units]", log_x_axis=True, to_save=True,
                               folder_name=data_folder_name, suffix="change_rate_5order_all")
         except FileNotFoundError:
-            print(f"The file {full_path} does not exist.")
+            print(f"The file {FILE_NONLINEAR_CASE2_VS_K} does not exist.")
     ########################################################################
     ############# - Performance vs. sparsity level  ########################
     ########################################################################
@@ -373,10 +394,7 @@ if __name__ == "__main__":
                         sparsity_dict_list[idx] = result
 
             # Save
-            performance_vs_sparsity_5order_10nodes100MC_new_file_name = "performance_vs_sparsity_5order_10nodes100MC_new.pkl"
-            full_path = os.path.join(data_folder_name,
-                                     performance_vs_sparsity_5order_10nodes100MC_new_file_name)
-            with open(full_path, "wb") as f:
+            with open(FILE_NONLINEAR_CASE2_VS_SPARSITY, "wb") as f:
                 pickle.dump(sparsity_dict_list, f)
 
             plot_vs_parameter(cfg_non_linear_vs_sparsity["sparsity_list"], sparsity_dict_list, "mse",
@@ -389,7 +407,7 @@ if __name__ == "__main__":
                               folder_name=data_folder_name, suffix="sparsity_5order_all")
 
         except FileNotFoundError:
-            print(f"The file {full_path} does not exist.")
+            print(f"The file {FILE_NONLINEAR_CASE2_VS_SPARSITY} does not exist.")
     #########################################################################
     ########################### - Run time vs. poly order  ##################
     #########################################################################
@@ -409,10 +427,7 @@ if __name__ == "__main__":
                         poly_order_dict_list[idx] = result
 
             # Save
-            performance_vs_poly_order_file_name = "performance_vs_poly_order.pkl"
-            full_path = os.path.join(data_folder_name,
-                                     performance_vs_poly_order_file_name)
-            with open(full_path, "wb") as f:
+            with open(FILE_N10_VS_POLY_ORDER, "wb") as f:
                 pickle.dump(poly_order_dict_list, f)
 
             plot_vs_parameter(cfg_non_linear_vs_filter_order["p_list"], poly_order_dict_list, "mse", aggregation_func=mean_func,
@@ -429,6 +444,39 @@ if __name__ == "__main__":
                               suffix="n10")
 
         except FileNotFoundError:
-            print(f"The file {full_path} does not exist.")
+            print(f"The file {FILE_N10_VS_POLY_ORDER} does not exist.")
+
+    #########################################################################
+    ############# - Performance vs. thr - Linear case (GSP-EKF) ############
+    #########################################################################
+    if to_plot_linear_vs_thr:
+        try:
+            with simulation("Linear case - Performance vs. thr"):
+                _run_vs_thr(cfg_linear_vs_thr, FOLDER_PERFORMANCE_VS_THR,
+                            FILE_LINEAR_VS_THR, "linear_vs_thr")
+        except FileNotFoundError:
+            print(f"The file {FILE_LINEAR_VS_THR} does not exist.")
+
+    #########################################################################
+    ########## - Performance vs. thr - Non-Linear case 1 (GSP-EKF) #########
+    #########################################################################
+    if to_plot_non_linear_case1_vs_thr:
+        try:
+            with simulation("Non-Linear case 1 - Performance vs. thr"):
+                _run_vs_thr(cfg_non_linear_case1_vs_thr, FOLDER_PERFORMANCE_VS_THR,
+                            FILE_NONLINEAR_CASE1_VS_THR, "nonlinear_case1_vs_thr")
+        except FileNotFoundError:
+            print(f"The file {FILE_NONLINEAR_CASE1_VS_THR} does not exist.")
+
+    #########################################################################
+    ########## - Performance vs. thr - Non-Linear case 2 (GSP-EKF) #########
+    #########################################################################
+    if to_plot_non_linear_case2_vs_thr:
+        try:
+            with simulation("Non-Linear case 2 - Performance vs. thr"):
+                _run_vs_thr(cfg_non_linear_case2_vs_thr, FOLDER_PERFORMANCE_VS_THR,
+                            FILE_NONLINEAR_CASE2_VS_THR, "nonlinear_case2_vs_thr")
+        except FileNotFoundError:
+            print(f"The file {FILE_NONLINEAR_CASE2_VS_THR} does not exist.")
 
     a = 5

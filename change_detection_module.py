@@ -169,7 +169,7 @@ class ChangeDetectionMethod(nn.Module):
         ) / sigma_Y
 
         objective = cp.Minimize(
-            cp.sum_squares((Delta_Y_t / sigma_Y) - Delta_Y_t_prime)  # ‖·‖_F² / σ_Y²
+            cp.sum_squares(( sigma_L/ sigma_Y) * Delta_Y_t - Delta_Y_t_prime)  # ‖·‖_F² / σ_Y²
             + beta1_scaled * cp.norm1(Delta_L_tilde)  # β₁‖ΔL̃‖₁
             + beta2_scaled * cp.normNuc(Delta_L_tilde)  # β₂‖ΔL̃‖_*
         )

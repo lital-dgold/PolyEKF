@@ -141,15 +141,16 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
     def __init__(self, F, B, C_u, C_w, C_x, StateInit, poly_c, new_connections_uncertainty_weight):
         super(oraclKalmanFilt_paper, self).__init__(F, B, C_u, C_w, C_x, StateInit, poly_c)
         self.new_connections_uncertainty_weight = new_connections_uncertainty_weight
+        self.C_x = C_x.copy()
+        self.prev_connections = np.array([])
+    def update(self, q, y, connections, new_connections):
+        B_small = self.B[:, connections]  # only active columns
+        edges_small = [self.edges[i] for i in connections]  # only active edges
+        s_small = self.s[connections]  # only active weights
 
-    def update(self, q, y, connections):
-        connections_int = np.asarray(connections, dtype=int)
-        old_connections = np.asarray(np.where(self.s > 0)[0], dtype=int)
-        new_connections = np.setdiff1d(connections_int, old_connections)
-        self.s[new_connections] = self.new_connections_uncertainty_weight
-        L = build_L(self.B, self.s)
-        H = compute_Jacobian_poly_dp(L, self.B, q, self.a, self.edges)
-        H = H[:, connections]
+        L = build_L(B_small, s_small)  # L built only from active edges
+        H = compute_Jacobian_poly_dp(L, B_small, q, self.a, edges_small)  # Jacobian in reduced space
+
         uncertainty_sigma = self.Sigma
         uncertainty_sigma_small = uncertainty_sigma[np.ix_(connections, connections)]
         S, K, Sigma_small = kalman_gain_imp(H, uncertainty_sigma_small, self.W)
@@ -159,10 +160,26 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
 
     def forward(self, q, y, *args):
         updated_connections = args[0]
-        super(oraclKalmanFilt_paper, self).predict()
-        disconnections = np.setdiff1d(np.arange(self.s.shape[0]), updated_connections)
+        disconnections = np.setdiff1d(self.prev_connections, updated_connections).astype(int)
+        new_connections = np.setdiff1d(updated_connections, self.prev_connections).astype(int)
+        topology_changed = len(disconnections) > 0 or len(new_connections) > 0
+        if topology_changed:
+             # if len(disconnections) > 0 or len(new_connections) > 0:
+            affected = np.union1d(disconnections, new_connections).astype(int)
+            # Reset Sigma for affected nodes
+            self.Sigma[affected, :] = 0
+            self.Sigma[:, affected] = 0
+            self.Sigma[new_connections, new_connections] = self.C_x[new_connections, new_connections]
+            # Reset s for ALL active connections, not just new ones
+            self.s[updated_connections] = self.new_connections_uncertainty_weight
         self.s[disconnections] = 0
-        self.update(q, y, updated_connections)
+        # self.s[new_connections] = self.new_connections_uncertainty_weight
+        # self.Sigma[new_connections, new_connections] = self.C_x[new_connections, new_connections]
+
+        super(oraclKalmanFilt_paper, self).predict()
+        self.s[disconnections] = 0  # re-zero after predict to prevent leakage
+        self.update(q, y, updated_connections, new_connections)
         self.s = np.maximum(self.s, 0)
+        self.prev_connections = updated_connections
         return self.s
 

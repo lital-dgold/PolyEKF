@@ -209,6 +209,27 @@ def map_B_to_set(B):
     return index_pairs
 
 
+def extract_x_to_match_B_from_L(L, B):
+    x = np.zeros([B.shape[1],1])
+
+    # Loop through each column
+    for idx, col in enumerate(range(B.shape[1])):
+        # Find indices where the column is non-zero
+        nonzero_indices = np.nonzero(B[:, col])[0]
+
+        # Ensure there are exactly two non-zero indices
+        if len(nonzero_indices) != 2:
+            raise ValueError(f"Column {col} does not have exactly two nonzero entries.")
+
+        # Append as poly_c tuple
+        w1 = L[nonzero_indices[0], nonzero_indices[1]]
+        w2 = L[nonzero_indices[1], nonzero_indices[0]]
+        if w1 != w2:
+            raise ValueError(f"Column {nonzero_indices[0]}, {nonzero_indices[1]} does not have exactly same weights in both directions.")
+        x[idx] = -w1
+    return x
+
+
 def num_possible_edges(N):
     assert N >= 1, f"N must be >= 1, but N={N}"
     return int(N * (N - 1) / 2)
@@ -420,7 +441,7 @@ def update_performance_vs_time_data(orig_file_name, new_data_file_name, file_nam
         return merged_dict_list
 
 # -------------------------  Simulation running functions  -------------------------
-def one_method_evaluation(kf, measurements_q, measurements_y, position, updated_connections_list):
+def one_method_evaluation(kf, measurements_q, measurements_y, position, updated_connections_list, mse_threshold=None):
     mse_list = []
     normalized_mse_list = []
     F1_score_list = []
@@ -429,12 +450,18 @@ def one_method_evaluation(kf, measurements_q, measurements_y, position, updated_
     times_list = []
     for i, (q, y, true_state, updated_connections) in enumerate(
             zip(measurements_q, measurements_y, position, updated_connections_list)):
-        start = time.time()
+        q = q.reshape(-1, 1)
+        y = y.reshape(-1, 1)
+        # updated_connections = updated_connections.reshape(-1, 1)
+        true_state = true_state.reshape(-1, 1)
+        start = time.process_time()
         x_est = kf(q, y, updated_connections)
-        end = time.time()
+        end = time.process_time()
         elapsed = end - start
         mse, normalized_mse = calc_mse(x_est, true_state)
-        logging.info(f"Iteration {i}: Execution time = {elapsed:.6f} seconds, mse={mse[0][0]}")
+        logging.info(f"Iteration {i}: Execution time = {elapsed:.6f} seconds, mse={mse[0][0]}, nmse={normalized_mse[0][0]}")
+        if mse_threshold is not None and mse[0][0] > mse_threshold:
+            raise ValueError(f"MSE {mse[0][0]:.3e} exceeded threshold {mse_threshold:.3e} at step {i}")
         mse_list.append(mse)
         normalized_mse_list.append(normalized_mse)
         F1_score_list.append(calc_f1_score(x_est, true_state))
@@ -472,8 +499,8 @@ max_workers = pick_worker_count()
 
 # -------------------------  Results processing functions  -------------------------
 def aggregate_across_runs(runs, metric, method):
-    """Stack the chosen metric across Monte-Carlo repetitions."""
-    return np.stack([r[method][metric] for r in runs])      # shape: (R, T)
+    """Stack the chosen metric across Monte-Carlo repetitions (skips runs missing the method)."""
+    return np.stack([r[method][metric] for r in runs if method in r])      # shape: (R, T)
 
 
 def stack_across_runs(runs, method):
@@ -481,11 +508,13 @@ def stack_across_runs(runs, method):
     return np.stack([r[method] for r in runs])
 
 def compute_metric_summary(runs, metric, methods_to_plot=None):
-    methods_list = methods_to_plot if methods_to_plot is not None else runs[0].keys()
+    all_methods = set().union(*[r.keys() for r in runs])
+    methods_list = methods_to_plot if methods_to_plot is not None else all_methods
     summary_table = {}
     for method in methods_list:
-        if method in runs[0].keys():
-            y = aggregate_across_runs(runs, metric, method).mean(axis=0)
+        valid_runs = [r for r in runs if method in r]
+        if valid_runs:
+            y = np.stack([r[method][metric] for r in valid_runs])
             summary_table[method] = y
     return summary_table
 
@@ -493,7 +522,7 @@ def compute_metric_summary(runs, metric, methods_to_plot=None):
 def create_table(runs, metric, methods_to_plot=None):
     methods_dict = compute_metric_summary(runs, metric, methods_to_plot=methods_to_plot)
     for method in methods_dict.keys():
-        methods_dict[method] = methods_dict[method].mean()
+        methods_dict[method] = methods_dict[method].mean(axis=0).mean()
     return methods_dict
 
 
@@ -502,44 +531,99 @@ LINE_STYLES = ['-', '--', '-.', ':', (0, (3, 1, 1, 1)), (0, (5, 5))]
 LINE_WIDTH = 2.5
 MARKERS = ['o', 's', 'v', '^', 'D', 'x', '*', 'P', 'h', '+']  # extend as needed
 
+# Per-method style assignments — edit here to change a method's appearance.
+# Keys match METHODS_ORDER in constants.py.
+_PALETTE = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+METHOD_COLORS = {
+    "prob_ssm":    _PALETTE[8],
+    "pred_corr":   _PALETTE[7],
+    "lms":         _PALETTE[6],
+    "grls":        _PALETTE[5],
+    "change-det":  _PALETTE[4],
+    "oracle-block":_PALETTE[3],
+    "ekf":         _PALETTE[1],   # same color as fast-ekf (both labelled "EKF")
+    "fast-ekf":    _PALETTE[1],
+    "gsp-ekf":     _PALETTE[0],
+}
+METHOD_LINE_STYLES = {
+    "prob_ssm":    LINE_STYLES[8 % len(LINE_STYLES)],
+    "pred_corr":   LINE_STYLES[7 % len(LINE_STYLES)],
+    "lms":         LINE_STYLES[6 % len(LINE_STYLES)],
+    "grls":        LINE_STYLES[5 % len(LINE_STYLES)],
+    "change-det":  LINE_STYLES[4 % len(LINE_STYLES)],
+    "oracle-block":LINE_STYLES[3 % len(LINE_STYLES)],
+    "ekf":         LINE_STYLES[1 % len(LINE_STYLES)],   # same as fast-ekf
+    "fast-ekf":    LINE_STYLES[1 % len(LINE_STYLES)],
+    "gsp-ekf":     LINE_STYLES[0 % len(LINE_STYLES)],
+}
+METHOD_MARKERS = {
+    "prob_ssm":    MARKERS[8 % len(MARKERS)],
+    "pred_corr":   MARKERS[7 % len(MARKERS)],
+    "lms":         MARKERS[6 % len(MARKERS)],
+    "grls":        MARKERS[5 % len(MARKERS)],
+    "change-det":  MARKERS[4 % len(MARKERS)],
+    "oracle-block":MARKERS[3 % len(MARKERS)],
+    "ekf":         MARKERS[2 % len(MARKERS)],
+    "fast-ekf":    MARKERS[1 % len(MARKERS)],
+    "gsp-ekf":     MARKERS[0 % len(MARKERS)],
+}
 
-def get_line_style(method, method_list=None):
-    if method_list is None:
-        return LINE_STYLES[hash(method) % len(LINE_STYLES)]
-    index = method_list.index(method) % len(LINE_STYLES)
-    return LINE_STYLES[index]
+
+def get_color(method):
+    return METHOD_COLORS.get(method, '#000000')
 
 
-def get_marker(method, method_list=None):
-    if method_list is None:
-        return MARKERS[hash(method) % len(MARKERS)]
-    index = method_list.index(method) % len(MARKERS)
-    return MARKERS[index]
+def get_line_style(method, method_list=None, global_method_list=None):
+    return METHOD_LINE_STYLES.get(method, '-')
 
 
-def plot_metric(time, runs, metric, labels=None, methods_to_plot=None, log_format=False, to_save=False, folder_name="",
-                suffix=""):
+def get_marker(method, method_list=None, global_method_list=None):
+    return METHOD_MARKERS.get(method, 'o')
+
+
+def plot_metric(time, runs, metric, labels=None, methods_to_plot=None, log_format=False,
+                error_bars=True, to_save=False, folder_name="", suffix="", legend_loc='outside', ylim_lower=0, ylim_upper=0):
     plt.rcParams.update({'font.size': 12})
     methods_dict = compute_metric_summary(runs, metric, methods_to_plot=methods_to_plot)
     plt.figure()
     methods_list = list(methods_dict.keys())
+    abs_min = []
+    abs_max = []
     for method in methods_list:
             y = methods_dict[method]
-            linestyle = get_line_style(method, methods_list)
-            # marker = get_marker(method, methods_list)
+            linestyle = get_line_style(method, methods_list, global_method_list=methods_to_plot)
+            color = get_color(method)
             label = method if labels is None else labels[method]
             if log_format:
-                plt.plot(time, 10 * np.log10(y), label=label, linestyle=linestyle, linewidth=LINE_WIDTH)
-            else:
-                plt.plot(time, y, label=label, linestyle=linestyle, linewidth=LINE_WIDTH)
+                y = 10 * np.log10(np.maximum(y, 1e-12))
+            mean_y = y.mean(axis=0).ravel()
+            std_y = y.std(axis=0).ravel()
+            lower_bound = mean_y - std_y
+            upper_bound = mean_y + std_y
+
+            line, = plt.plot(time, mean_y, label=label, linestyle=linestyle, color=color, linewidth=LINE_WIDTH)
+            if error_bars and y.shape[0] > 1:
+                plt.fill_between(time, lower_bound, upper_bound, color=color, alpha=0.15)
+            abs_min.append(min(lower_bound.reshape(-1)))
+            abs_max.append(max(upper_bound.reshape(-1)))
+
     plt.xlabel("l [time units]")
     postfix = " [dB]" if log_format else ""
     prefix = "N" if (metric == "mse") else ""
     YLABEL = prefix + metric.upper() + postfix
     plt.ylabel(YLABEL)
     plt.xlim(time[0], time[-1])
+    gap1 = max(abs_max) - min(abs_min)
+    plt.ylim(min(abs_min) - ylim_lower * gap1, max(abs_max) + ylim_upper * gap1)
     plt.grid()
-    plt.legend()
+    if isinstance(legend_loc, str):
+        if legend_loc == 'outside':
+            plt.legend(ncol=1, bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+        else:
+            plt.legend(ncol=2, loc=legend_loc)
+    else:
+        plt.legend(ncol=2, bbox_to_anchor=legend_loc)
     if to_save:
         full_path = os.path.join(folder_name, f"{metric}_vs_time_{suffix}.png")
         plt.savefig(full_path, format='png', bbox_inches='tight', pad_inches=0.1)
@@ -556,35 +640,62 @@ def mean_func(table):
 
 def plot_vs_parameter(parameter_values_list, runs, metric, aggregation_func=unit_func, labels=None,
                       methods_to_plot=None, log_format=False, log_x_axis=False, x_label1="", to_save=False,
-                      folder_name="", suffix=""):
+                      folder_name="", suffix="", error_bars=True, legend_loc='outside', ylim_lower=0, ylim_upper=0):
     plt.rcParams.update({'font.size': 16})
-    mean_metric_along_trajectory = []
-    for idx in range(len(parameter_values_list)):
-        methods_dict = compute_metric_summary(runs[idx], metric)
-        mean_metric_along_trajectory.append(methods_dict)
-    methods_list = methods_to_plot if methods_to_plot is not None else list(mean_metric_along_trajectory[0].keys())
+    # Determine methods to plot: gather all methods present across all parameter points and MC runs
+    all_methods = set().union(*[set().union(*[r.keys() for r in param_runs]) for param_runs in runs])
+    methods_list = methods_to_plot if methods_to_plot is not None else list(all_methods)
+    abs_min = []
+    abs_max = []
     plt.figure()
     for method in methods_list:
-        if method in mean_metric_along_trajectory[0].keys():
-            metric_along_trajectory_vs_parameter = np.stack([r[method] for r in mean_metric_along_trajectory]).squeeze()
-            y = aggregation_func(metric_along_trajectory_vs_parameter)
-            linestyle = get_line_style(method, methods_list)
-            marker = get_marker(method, methods_list)
-            label = method if labels is None else labels[method]
+        if not any(method in r for param_runs in runs for r in param_runs):
+            continue
+        # Build per-MC aggregated values for every parameter point
+        # raw: (R, T) -> aggregation_func reduces time -> (R,)
+        y_per_mc_list = []
+        for idx in range(len(parameter_values_list)):
+            raw = aggregate_across_runs(runs[idx], metric, method).squeeze()   # (R, T)
             if log_format:
-                plt.plot(parameter_values_list, 10 * np.log10(y), label=label, linestyle=linestyle, marker=marker, linewidth=LINE_WIDTH)
-            else:
-                plt.plot(parameter_values_list, y, label=label, linestyle=linestyle, marker=marker, linewidth=LINE_WIDTH)
+                raw = 10 * np.log10(np.maximum(raw, 1e-12))
+            per_mc = aggregation_func(raw)                   # fallback: mean over time
+            y_per_mc_list.append(per_mc)
+        y_per_mc = np.stack(y_per_mc_list)                            # (num_params, R)
+
+        mean_y = y_per_mc.mean(axis=1)                                # (num_params,)
+        std_y  = y_per_mc.std(axis=1)
+        lower_bound = mean_y - std_y
+        upper_bound = mean_y + std_y
+        abs_min.append(min(lower_bound.reshape(-1)))
+        abs_max.append(max(upper_bound.reshape(-1)))
+
+        linestyle = get_line_style(method, methods_list, global_method_list=methods_to_plot)
+        marker = get_marker(method, methods_list, global_method_list=methods_to_plot)
+        color = get_color(method)
+        label = method if labels is None else labels[method]
+        line, = plt.plot(parameter_values_list, mean_y, label=label,
+                         linestyle=linestyle, marker=marker, color=color, linewidth=LINE_WIDTH)
+        if error_bars:
+            plt.fill_between(parameter_values_list, lower_bound, upper_bound,
+                             color=color, alpha=0.15)
     plt.xlabel(x_label1)
     if log_x_axis:
         plt.xscale('log', base=2)
     postfix = " [dB]" if log_format else ""
     prefix = "N" if (metric == "mse") else ""
-    YLABEL = prefix + metric.upper() + postfix
+    YLABEL = prefix + metric.upper() + postfix if (metric != "times") else "TIME" + postfix
     plt.ylabel(YLABEL)
     plt.xlim(parameter_values_list[0], parameter_values_list[-1])
+    gap1 = max(abs_max) - min(abs_min)
+    plt.ylim(min(abs_min) - ylim_lower * gap1, max(abs_max) + ylim_upper * gap1)
     plt.grid()
-    plt.legend()
+    if isinstance(legend_loc, str):
+        if legend_loc == 'outside':
+            plt.legend(ncol=1, bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+        else:
+            plt.legend(ncol=2, loc=legend_loc)
+    else:
+        plt.legend(ncol=2, bbox_to_anchor=legend_loc)
     if to_save:
         full_path = os.path.join(folder_name, f"{metric}_vs_{suffix}.png")
         plt.savefig(full_path, format='png', bbox_inches='tight', pad_inches=0.1)
@@ -594,40 +705,49 @@ def plot_vs_parameter(parameter_values_list, runs, metric, aggregation_func=unit
 
 
 # -------------------------  Post running functions  -------------------------
-def update_performance_vs_time_data(orig_file_name, new_data_file_name, file_name_to_save):
-    with open(orig_file_name, "rb") as f:
-        orig_data = pickle.load(f)
-    # orig_data = orig_data[1:]
-    with open(new_data_file_name, "rb") as f:
-        new_data = pickle.load(f)
+def update_performance_vs_time_data(orig_file_name, new_data_file_name):
+    orig_data = orig_file_name if isinstance(orig_file_name, list) else pickle.load(open(orig_file_name, "rb"))
+    new_data  = new_data_file_name if isinstance(new_data_file_name, list) else pickle.load(open(new_data_file_name, "rb"))
+    num_iters = max(len(orig_data), len(new_data))
     new_dict_list1 = []
-    for iter_idx in range(len(new_data)):
+    for iter_idx in range(num_iters):
         new_dict = dict()
-        temp = orig_data[iter_idx]
-        del temp["ekf"]
-        new_dict.update(temp)
-        new_dict.update(new_data[iter_idx])
+        # del orig_data[iter_idx]["ekf"]
+        if iter_idx < len(orig_data):
+            new_dict.update(orig_data[iter_idx])
+        if iter_idx < len(new_data):
+            new_dict.update(new_data[iter_idx])
         new_dict_list1.append(new_dict)
-    with open(file_name_to_save, "wb") as f:
-        pickle.dump(new_dict_list1, f)
+    # with open(file_name_to_save, "wb") as f:
+    #     pickle.dump(new_dict_list1, f)
     return new_dict_list1
 
 
-def update_performance_vs_parameter_data(orig_file_name, new_data_file_name, file_name_to_save):
-    with open(orig_file_name, "rb") as f:
-        orig_data = pickle.load(f)
+def update_performance_vs_parameter_data(orig_file_name, new_data_file_name=None):
+    orig_data = orig_file_name if isinstance(orig_file_name, list) else pickle.load(open(orig_file_name, "rb"))
     # orig_data = orig_data[1:]
-    with open(new_data_file_name, "rb") as f:
-        new_data = pickle.load(f)
+    if new_data_file_name is None:
+        return orig_data
+    new_data = new_data_file_name if isinstance(new_data_file_name, list) else pickle.load(open(new_data_file_name, "rb"))
+    # orig_data: [iter_idx][param_idx]  (outer = MC iterations, inner = parameter values)
+    # new_data:  [param_idx][iter_idx]  (outer = parameter values, inner = MC iterations)
+    orig_num_params = len(orig_data)
+    orig_num_iters = len(orig_data[0])
+    new_num_params = len(new_data)
+    assert new_num_params == orig_num_params, "new_num_params != orig_num_params, matching according to param value is not possible"
+    new_num_iters = len(new_data[0])
+    num_iters = max(orig_num_iters, new_num_iters)
     merged_dict_list = []
-    for parameter_val in range(len(new_data)):
+    for param_idx in range(len(new_data)):
         new_dict_list1 = []
-        for iter_idx in range(len(new_data[parameter_val])):
+        for iter_idx in range(num_iters):
             new_dict = dict()
-            new_dict.update(orig_data[parameter_val][iter_idx])
-            new_dict.update(new_data[parameter_val][iter_idx])
+            if iter_idx < orig_num_iters:
+                new_dict.update(orig_data[param_idx][iter_idx])
+            if iter_idx < new_num_iters:
+                new_dict.update(new_data[param_idx][iter_idx])
             new_dict_list1.append(new_dict)
         merged_dict_list.append(new_dict_list1)
-    with open(file_name_to_save, "wb") as f:
-        pickle.dump(merged_dict_list, f)
+    # with open(file_name_to_save, "wb") as f:
+    #     pickle.dump(merged_dict_list, f)
     return merged_dict_list
