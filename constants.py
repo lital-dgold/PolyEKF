@@ -87,8 +87,8 @@ FILE_NONLINEAR_CASE2_VS_SNR = "nonlinear_case2_vs_snr.pkl"
 FILE_NONLINEAR_CASE2_VS_DELTA_N = "nonlinear_case2_vs_delta_n.pkl"
 FILE_NONLINEAR_CASE2_VS_K = "nonlinear_case2_vs_k.pkl"
 FILE_NONLINEAR_CASE2_VS_SPARSITY = "nonlinear_case2_vs_sparsity.pkl"
+FILE_NONLINEAR_CASE1_VS_DEGREE_STD = "nonlinear_case1_vs_degree_std.pkl"
 FILE_N10_VS_POLY_ORDER = "n10_vs_poly_order.pkl"
-
 RESULTS_DIR_GRLS = "Results\\GRLS"
 
 # ── Performance vs. time ─────────────────────────────────────────────
@@ -101,6 +101,7 @@ FILE_NONLINEAR_CASE2_VS_SNR_GRLS      = _os.path.join(RESULTS_DIR_GRLS, FILE_NON
 FILE_NONLINEAR_CASE2_VS_DELTA_N_GRLS  = _os.path.join(RESULTS_DIR_GRLS, FILE_NONLINEAR_CASE2_VS_DELTA_N)
 FILE_NONLINEAR_CASE2_VS_K_GRLS        = _os.path.join(RESULTS_DIR_GRLS, FILE_NONLINEAR_CASE2_VS_K)
 FILE_NONLINEAR_CASE2_VS_SPARSITY_GRLS = _os.path.join(RESULTS_DIR_GRLS, FILE_NONLINEAR_CASE2_VS_SPARSITY)
+FILE_NONLINEAR_CASE1_VS_DEGREE_STD_GRLS = _os.path.join(RESULTS_DIR_GRLS, FILE_NONLINEAR_CASE1_VS_DEGREE_STD)
 FILE_N10_VS_POLY_ORDER_GRLS           = _os.path.join(RESULTS_DIR_GRLS, FILE_N10_VS_POLY_ORDER)
 
 
@@ -142,6 +143,11 @@ FILE_NONLINEAR_CASE2_VS_K_V1 =  _os.path.join(FOLDER_NONLINEAR_CASE2_VS_K, "perf
 FOLDER_NONLINEAR_CASE2_VS_SPARSITY = "Results\\performance_vs_sparsity"
 FILE_NONLINEAR_CASE2_VS_SPARSITY_V1 =  _os.path.join(FOLDER_NONLINEAR_CASE2_VS_SPARSITY, "performance_vs_sparsity_5order_10nodes100MC_new.pkl")
 
+FOLDER_NONLINEAR_CASE1_VS_DEGREE_STD = "Results\\performance_vs_degree_std"
+FILE_NONLINEAR_CASE1_VS_DEGREE_STD = _os.path.join(FOLDER_NONLINEAR_CASE1_VS_DEGREE_STD, FILE_NONLINEAR_CASE1_VS_DEGREE_STD)
+FILE_NONLINEAR_CASE1_VS_DEGREE_STD_CHANGE_DET = _os.path.join(FOLDER_NONLINEAR_CASE1_VS_DEGREE_STD,
+                                                              "nonlinear_case1_vs_degree_std_change_det.pkl")
+
 FOLDER_N10_VS_POLY_ORDER = "Results\\performance_vs_poly_order"
 FILE_N10_VS_POLY_ORDER_V1 =  _os.path.join(FOLDER_N10_VS_POLY_ORDER, "performance_vs_poly_order.pkl")
 
@@ -151,7 +157,7 @@ FILE_NONLINEAR_CASE1_VS_THR   = _os.path.join(FOLDER_PERFORMANCE_VS_THR, "gsp_ek
 FILE_NONLINEAR_CASE2_VS_THR   = _os.path.join(FOLDER_PERFORMANCE_VS_THR, "gsp_ekf_vs_thr_nonlinear_case2.pkl")
 
 # -------------- Power data experiment
-FOLDER_POWER_DATA = "Power_data\\Results57"
+FOLDER_POWER_DATA = "Results\\Power_data_exp\\Results57"
 FILE_POWER_DATA_EKF = _os.path.join(FOLDER_POWER_DATA,  "fast-ekf.pkl")
 FILE_POWER_DATA_ORACLE = _os.path.join(FOLDER_POWER_DATA,  "oracle-block.pkl")
 FILE_POWER_DATA_GSP_EKF = _os.path.join(FOLDER_POWER_DATA,  "gsp-ekf.pkl")
@@ -159,6 +165,9 @@ FILE_POWER_DATA_GRLS = _os.path.join(FOLDER_POWER_DATA,  "grls.pkl")
 FILE_POWER_DATA_PROB_SSM = _os.path.join(FOLDER_POWER_DATA,  "prob-ssm.pkl")
 FILE_POWER_DATA_CHANGE_DET = _os.path.join(FOLDER_POWER_DATA,  "change-det.pkl")
 
+FOLDER_POWER_DATA_RTE7000 = "Results\\Power_data_exp\\ResultsRTE7000"
+DATASET_GLOB = "Power_data/rte7000_ac_syn_dataset*"
+PROVENANCE_KEY = "_dataset_folder"
 #########################################################################
 B = 'best'
 UR = 'upper right'
@@ -362,6 +371,19 @@ cfg_non_linear_vs_sparsity.update({
     "C_u_sqrt": np.dot(0.05 ** 0.5, np.eye(cfg_non_linear_vs_sparsity["m"])),
     "k": cfg_non_linear_vs_sparsity["n"],
     "num_iterations": 100,
+})
+
+########################################################################
+##### - Performance vs. sparsity and degree std - Non-Linear case 1 ####
+########################################################################
+cfg_non_linear_case1_vs_degree_std = cfg_non_linear_case1.copy()
+for key1 in ["num_edges_stateinit",]:
+    del cfg_non_linear_case1_vs_degree_std[key1]
+cfg_non_linear_case1_vs_degree_std.update({
+    "num_edges_values": [57, 114],
+    "degree_std_values": [(0, 0.5), (1.5, 2), (3, 3.5), (4, 4.5)],
+    "num_iterations": 100,
+    "trajectory_time": np.arange(0, 159),#159
 })
 
 #########################################################################

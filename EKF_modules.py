@@ -23,7 +23,16 @@ class KalmanFilt(nn.Module):
         # tracked state
         self.s = StateInit
 
+        self._F_is_identity = (
+            self.F_s.shape[0] == self.F_s.shape[1]
+            and np.array_equal(self.F_s, np.eye(self.F_s.shape[0]))
+        )
+
     def predict(self):
+        if self._F_is_identity:
+            self.Sigma += self.V_s
+            return
+
         # Update time state
         self.s = np.dot(self.F_s, self.s)
 
@@ -142,7 +151,8 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
         super(oraclKalmanFilt_paper, self).__init__(F, B, C_u, C_w, C_x, StateInit, poly_c)
         self.new_connections_uncertainty_weight = new_connections_uncertainty_weight
         self.C_x = C_x.copy()
-        self.prev_connections = np.array([])
+        self.prev_connections = np.sort(np.where(StateInit > 0.001)[0])
+
     def update(self, q, y, connections, new_connections):
         B_small = self.B[:, connections]  # only active columns
         edges_small = [self.edges[i] for i in connections]  # only active edges
@@ -155,7 +165,12 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
         uncertainty_sigma_small = uncertainty_sigma[np.ix_(connections, connections)]
         S, K, Sigma_small = kalman_gain_imp(H, uncertainty_sigma_small, self.W)
         self.s[connections] = (self.s[connections] + np.dot(K, (y - compute_poly(L, q, self.a))))
-        self.Sigma = np.zeros_like(self.Sigma)
+        # In-place zero instead of np.zeros_like (which reallocates the full
+        # m x m -- ~196MB at m~4950 -- array from scratch every call, ~500
+        # times per dataset per worker; the allocator churn from that was
+        # driving up RSS over the run and was the direct cause of an OOM kill
+        # under concurrent workers on the cluster).
+        self.Sigma.fill(0)
         self.Sigma[np.ix_(connections, connections)] = Sigma_small
 
     def forward(self, q, y, *args):
@@ -170,8 +185,7 @@ class oraclKalmanFilt_paper(FastExtendedKalmanFilter):
             self.Sigma[affected, :] = 0
             self.Sigma[:, affected] = 0
             self.Sigma[new_connections, new_connections] = self.C_x[new_connections, new_connections]
-            # Reset s for ALL active connections, not just new ones
-            self.s[updated_connections] = self.new_connections_uncertainty_weight
+            self.s[new_connections] = self.new_connections_uncertainty_weight
         self.s[disconnections] = 0
         # self.s[new_connections] = self.new_connections_uncertainty_weight
         # self.Sigma[new_connections, new_connections] = self.C_x[new_connections, new_connections]

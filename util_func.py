@@ -5,6 +5,9 @@ import matplotlib
 import pickle
 import logging
 import os, psutil, time
+import glob
+import re
+import itertools
 from numpy.linalg import svd
 
 matplotlib.use('TkAgg')  # or 'Agg', 'Qt5Agg', etc. depending on your setup
@@ -72,6 +75,91 @@ def chose_indices_without_repeating(max_num_edges, num_of_edges):
     assert max_num_edges >= num_of_edges, f"max_num_edges >= num_of_edges, but max_num_edges={max_num_edges} and num_of_edges={num_of_edges}"
     import random
     return random.sample(range(max_num_edges), num_of_edges)
+
+
+def generate_degree_sequence(N, num_edges, degree_std, rng=None):
+    """
+    Random degree sequence for N nodes summing to 2*num_edges, with the given
+    standard deviation of the degree distribution (degree_std=0 yields the
+    most homogeneous/regular sequence possible; larger values let a few
+    high-degree hub nodes emerge).
+    """
+    rng = np.random.default_rng() if rng is None else rng
+    target_sum = 2 * num_edges
+    mean_degree = target_sum / N
+    degrees = np.clip(np.round(rng.normal(mean_degree, degree_std, size=N)), 0, N - 1).astype(int)
+
+    # Force the sum back to target_sum (rounding/clipping can drift it off).
+    diff = target_sum - degrees.sum()
+    while diff != 0:
+        idx = rng.integers(0, N)
+        if diff > 0 and degrees[idx] < N - 1:
+            degrees[idx] += 1
+            diff -= 1
+        elif diff < 0 and degrees[idx] > 0:
+            degrees[idx] -= 1
+            diff += 1
+    return degrees.tolist()
+
+
+def _realize_edge_indices(N, num_edges, target_std, rng):
+    """One attempt: sample a degree sequence around `target_std` and realize
+    a simple graph from it. Returns (idx_list, degrees) where `degrees` is
+    the *actual* per-node degree array of the realized graph."""
+    degree_sequence = generate_degree_sequence(N, num_edges, target_std, rng)
+    seed = int(rng.integers(0, 2 ** 31 - 1))
+
+    # The configuration model realizes even hub-heavy sequences in near-linear
+    # time (nx.random_degree_sequence_graph does not: its edge-swap search
+    # can stall for minutes once a single node's degree gets large relative
+    # to N). It collapses self-loops/parallel edges though, so top the result
+    # back up to num_edges, preferring the nodes that lost the most degree in
+    # that collapse (typically the hubs) to keep the intended std.
+    G = nx.Graph(nx.configuration_model(degree_sequence, seed=seed))
+    G.remove_edges_from(nx.selfloop_edges(G))
+    G.add_nodes_from(range(N))
+    deficit = np.clip(np.array(degree_sequence, dtype=float) -
+                       np.array([G.degree(n) for n in range(N)], dtype=float), 0.1, None)
+    while G.number_of_edges() < num_edges:
+        u, v = rng.choice(N, size=2, replace=False, p=deficit / deficit.sum())
+        if not G.has_edge(u, v):
+            G.add_edge(u, v)
+            deficit[u] = max(deficit[u] - 1, 0.1)
+            deficit[v] = max(deficit[v] - 1, 0.1)
+
+    edge_index = {pair: i for i, pair in enumerate(itertools.combinations(range(N), 2))}
+    idx_list = [edge_index[e] if e[0] < e[1] else edge_index[(e[1], e[0])] for e in G.edges()]
+    degrees = np.array([G.degree(n) for n in range(N)])
+    return idx_list, degrees
+
+
+def choose_edge_indices(N, num_edges, degree_std=0, rng=None, max_attempts=10000):
+    """
+    Pick `num_edges` of the N*(N-1)/2 possible edges, indexed in the same
+    order as itertools.combinations(range(N), 2) (matching the column order
+    of nx.incidence_matrix(nx.complete_graph(N))), by realizing a random
+    simple graph whose degree distribution has standard deviation
+    `degree_std` (0 = as homogeneous as possible).
+
+    `degree_std` may be a single target value, or a (low, high) range: on
+    small graphs a single normal-distribution draw is too coarse to hit an
+    exact std (rounding, clipping, and the edge-count repair step all add
+    noise), so a range instead resamples until the *realized* graph's
+    empirical degree std falls in [low, high).
+    """
+    assert num_possible_edges(N) >= num_edges, \
+        f"num_possible_edges(N) >= num_edges, but N={N} allows {num_possible_edges(N)} edges and num_edges={num_edges}"
+    rng = np.random.default_rng() if rng is None else rng
+    is_range = isinstance(degree_std, (tuple, list))
+    target_std = (degree_std[0] + degree_std[1]) / 2 if is_range else degree_std
+
+    for _ in range(max_attempts):
+        idx_list, degrees = _realize_edge_indices(N, num_edges, target_std, rng)
+        if not is_range or (degree_std[0] <= degrees.std() < degree_std[1]):
+            return idx_list
+    raise RuntimeError(
+        f"Could not realize a graph with degree std in {degree_std} after {max_attempts} attempts "
+        f"(last empirical std={degrees.std():.2f}); widen the range, or raise N/num_edges.")
 
 
 # -------------------------  Kalman filter util function  -------------------------
@@ -153,12 +241,12 @@ def single_update_iteration(state, F, B, C_w, C_u, N, k):
     return q, state, observation
 
 
-def get_trajectory(trajectory_time, F, B, C_w_sqrt, C_u_sqrt, N, k, poly_c, new_edge_weight, num_edges_stateinit, delta_n):
+def get_trajectory(trajectory_time, F, B, C_w_sqrt, C_u_sqrt, N, k, poly_c, new_edge_weight, num_edges_stateinit, delta_n, degree_std=0):
     position = []
     measurements_q = []
     measurements_y = []
     m = num_possible_edges(N)
-    idx_list = chose_indices_without_repeating(m, num_edges_stateinit)
+    idx_list = choose_edge_indices(N, num_edges_stateinit, degree_std)
     stateInit = np.zeros(m).reshape([m, 1])
     stateInit[idx_list] = new_edge_weight
     state = stateInit.copy()
@@ -452,7 +540,6 @@ def one_method_evaluation(kf, measurements_q, measurements_y, position, updated_
             zip(measurements_q, measurements_y, position, updated_connections_list)):
         q = q.reshape(-1, 1)
         y = y.reshape(-1, 1)
-        # updated_connections = updated_connections.reshape(-1, 1)
         true_state = true_state.reshape(-1, 1)
         start = time.process_time()
         x_est = kf(q, y, updated_connections)
@@ -474,6 +561,29 @@ def one_method_evaluation(kf, measurements_q, measurements_y, position, updated_
 
 
 # -------------------------  Running operation system functions  -------------------------
+def _slurm_cpu_count():
+    """
+    Cores actually granted to this SLURM job/step, if running under SLURM.
+
+    os.cpu_count() and psutil.cpu_percent() both see the whole physical node,
+    not the job's cgroup allocation -- on a shared node with many idle cores
+    that this job doesn't own, pick_worker_count() would otherwise spawn far
+    more worker processes than the job's --mem can support (each process
+    re-imports numpy/scipy/networkx, ~hundreds of MB baseline each), causing
+    an OOM kill even though most of those cores were never ours to use.
+    """
+    for var in ("SLURM_CPUS_PER_TASK", "SLURM_JOB_CPUS_PER_NODE", "SLURM_CPUS_ON_NODE"):
+        val = os.environ.get(var)
+        if val:
+            # SLURM_JOB_CPUS_PER_NODE can look like "4(x2)" for multi-node jobs --
+            # take the first integer token.
+            try:
+                return int(val.split("(")[0].split(",")[0])
+            except ValueError:
+                continue
+    return None
+
+
 def pick_worker_count(reserve_cores: int = 1,
                       idle_thresh: int = 20,
                       sample_secs: float = 0.2) -> int:
@@ -484,6 +594,12 @@ def pick_worker_count(reserve_cores: int = 1,
     idle_thresh    – treat a core as 'idle' if current util < this %
     sample_secs    – how long to measure utilisation
     """
+    slurm_logical = _slurm_cpu_count()
+    if slurm_logical is not None:
+        # Under SLURM: trust the job's own allocation instead of node-wide
+        # idle-core sampling, which reflects cores this job was never given.
+        return max(1, slurm_logical - reserve_cores)
+
     logical = os.cpu_count() or 1
 
     # single short sample – cheap enough for interactive jobs
@@ -519,12 +635,113 @@ def compute_metric_summary(runs, metric, methods_to_plot=None):
     return summary_table
 
 
-def create_table(runs, metric, methods_to_plot=None):
+def create_table(runs, metric, methods_to_plot=None, log_format=False):
     methods_dict = compute_metric_summary(runs, metric, methods_to_plot=methods_to_plot)
     for method in methods_dict.keys():
-        methods_dict[method] = methods_dict[method].mean(axis=0).mean()
+        y = methods_dict[method]
+        if log_format:
+            y = 10 * np.log10(np.maximum(y, 1e-12))
+        methods_dict[method] = y.mean(axis=0).mean()
     return methods_dict
 
+# RTE7000 Expirements utils for postprocessing of the data
+def local_dataset_dirs(dataset_dirs):
+    idx_to_dir = {}
+    for d in glob.glob(dataset_dirs):
+        m = re.search(r"dataset(\d+)$", d)
+        if m:
+            idx_to_dir[int(m.group(1))] = d
+    return idx_to_dir
+
+
+def load_method_files(results_dir):
+    """Return {method_name: raw_list} for every <method>.pkl in results_dir, unmerged."""
+    method_files = sorted(glob.glob(os.path.join(results_dir, "*.pkl")))
+    if not method_files:
+        raise FileNotFoundError(f"No .pkl files found in {results_dir}")
+    methods = {}
+    for f in method_files:
+        name = os.path.splitext(os.path.basename(f))[0]
+        with open(f, "rb") as fh:
+            methods[name] = pickle.load(fh)
+        print(f"  {name}: {len(methods[name])} entries ({os.path.basename(f)})")
+    return methods
+
+
+def build_provenance_mapping(raw_list, trajectory_mapping_key):
+    """{raw_position: true_dataset_idx} from the embedded PROVENANCE_KEY, if (nearly)
+    every entry carries it. Returns None if the field is absent or only partially
+    present (a pkl file generated before power_system_tracking.py started tagging
+    results, or a mixed/corrupt one)."""
+    mapping = {}
+    for i, entry in enumerate(raw_list):
+        folder = entry.get(trajectory_mapping_key)
+        if folder:
+            m = re.search(r"dataset(\d+)$", folder)
+            if m:
+                mapping[i] = int(m.group(1))
+    if raw_list and len(mapping) >= 0.99 * len(raw_list):
+        return mapping
+    if 0 < len(mapping) < len(raw_list):
+        logging.warn(f"Only {len(mapping)}/{len(raw_list)} entries carry '{trajectory_mapping_key}' -- "
+                       f"excluding this method rather than guessing at the rest.")
+    return None
+
+
+def resolve_index_mappings(methods, trajectory_mapping_key):
+    """Return {method_name: {raw_position: true_dataset_idx}} for every method whose
+    pkl carries embedded PROVENANCE_KEY on (nearly) every entry (exact -- see
+    power_system_tracking.py). A method without it is omitted rather than aligned
+    by guesswork."""
+    mappings = {}
+    for name, raw in methods.items():
+        m = build_provenance_mapping(raw, trajectory_mapping_key)
+        if m is not None:
+            mappings[name] = m
+            print(f"  '{name}': aligned via embedded '{trajectory_mapping_key}' (exact, {len(m)} entries)")
+        else:
+            logging.warn(f"'{name}' does not carry embedded '{trajectory_mapping_key}' on (nearly) every "
+                           f"entry -- excluding it. Rerun power_system_tracking.py to regenerate "
+                           f"its pkl with provenance tagging.")
+    return mappings
+
+
+def build_aligned_runs(methods, mappings):
+    """mappings: {method_name: {raw_position: true_dataset_idx}}."""
+    max_true_idx = max((t for m in mappings.values() for t in m.values()), default=-1)
+    runs = [dict() for _ in range(max_true_idx + 1)]
+    for name, mapping in mappings.items():
+        raw = methods[name]
+        for i, t in mapping.items():
+            if t < 0:
+                continue
+            runs[t].update(raw[i])
+    return runs
+
+
+def topology_change_counts(idx_to_dir):
+    counts = {}
+    for idx, d in idx_to_dir.items():
+        lt_path = os.path.join(d, "line_topology.npy")
+        if not os.path.exists(lt_path):
+            continue
+        lt = np.load(lt_path)
+        counts[idx] = int(np.sum(np.any(np.diff(lt, axis=0) != 0, axis=1)))
+    return counts
+
+
+def topology_change_times(folder):
+    """Timesteps (indices into line_topology's time axis) where any line's
+    in-service status differs from the previous step -- the moments a single
+    trajectory's topology actually changes."""
+    lt = np.load(os.path.join(folder, "line_topology.npy"))
+    return np.where(np.any(np.diff(lt, axis=0) != 0, axis=1))[0] + 1
+
+
+def select_trajectories(counts, n):
+    """The n trajectory indices with the most topology changes, ascending."""
+    candidates = sorted(counts.keys(), key=lambda i: counts[i])
+    return candidates[-n:]
 
 # -------------------------  Plotting Functions  -------------------------
 LINE_STYLES = ['-', '--', '-.', ':', (0, (3, 1, 1, 1)), (0, (5, 5))]
@@ -583,7 +800,8 @@ def get_marker(method, method_list=None, global_method_list=None):
 
 
 def plot_metric(time, runs, metric, labels=None, methods_to_plot=None, log_format=False,
-                error_bars=True, to_save=False, folder_name="", suffix="", legend_loc='outside', ylim_lower=0, ylim_upper=0):
+                error_bars=True, to_save=False, folder_name="", suffix="", legend_loc='outside', ylim_lower=0,
+                ylim_upper=0, ylabel_metric=None, change_times=None):
     plt.rcParams.update({'font.size': 12})
     methods_dict = compute_metric_summary(runs, metric, methods_to_plot=methods_to_plot)
     plt.figure()
@@ -610,12 +828,19 @@ def plot_metric(time, runs, metric, labels=None, methods_to_plot=None, log_forma
 
     plt.xlabel("l [time units]")
     postfix = " [dB]" if log_format else ""
-    prefix = "N" if (metric == "mse") else ""
-    YLABEL = prefix + metric.upper() + postfix
+    if ylabel_metric is not None:
+        YLABEL = ylabel_metric + postfix
+    else:
+        prefix = "N" if (metric == "mse") else ""
+        YLABEL = prefix + metric.upper() + postfix
     plt.ylabel(YLABEL)
     plt.xlim(time[0], time[-1])
     gap1 = max(abs_max) - min(abs_min)
     plt.ylim(min(abs_min) - ylim_lower * gap1, max(abs_max) + ylim_upper * gap1)
+    if change_times is not None:
+        for i, ct in enumerate(change_times):
+            plt.axvline(ct, color='gray', linestyle='--', linewidth=1, alpha=0.6,
+                        label='Topology change' if i == 0 else None)
     plt.grid()
     if isinstance(legend_loc, str):
         if legend_loc == 'outside':

@@ -1,0 +1,170 @@
+[
+  {
+    "id": "POTEAIN1",
+    "bus": "POTEAP6#10",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 75.69999694824219
+  },
+  {
+    "id": "GRAV57GRAV5T3",
+    "bus": "GRAV5P7#34",
+    "energy_source": "NUCLEAR",
+    "min_p": 180.0,
+    "max_p": 910.0
+  },
+  {
+    "id": "AMARGIN1",
+    "bus": "AMARGP6#19",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 28.299999237060547
+  },
+  {
+    "id": "AMARGIN3",
+    "bus": "AMARGP6#19",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 41.400001525878906
+  },
+  {
+    "id": "AMARGIN2",
+    "bus": "AMARGP6#19",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 37.79999923706055
+  },
+  {
+    "id": "PENLY7PENLYT2",
+    "bus": "PENLYP7#15",
+    "energy_source": "NUCLEAR",
+    "min_p": 266.0,
+    "max_p": 1330.0
+  },
+  {
+    "id": "GRAV57GRAV5T4",
+    "bus": "GRAV5P7#36",
+    "energy_source": "NUCLEAR",
+    "min_p": 180.0,
+    "max_p": 910.0
+  },
+  {
+    "id": "ARGOEIN1",
+    "bus": "ARGOEP6#26",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 42.599998474121094
+  },
+  {
+    "id": "GRAV57GRAV5T5",
+    "bus": "GRAV5P7#38",
+    "energy_source": "NUCLEAR",
+    "min_p": 180.0,
+    "max_p": 910.0
+  },
+  {
+    "id": "BLOCAIN1",
+    "bus": "BLOCAP6#23",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 63.5
+  },
+  {
+    "id": "BLOCAIN2",
+    "bus": "BLOCAP6#23",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 50.5
+  },
+  {
+    "id": "A.COMIN1",
+    "bus": "A.COMP6#15",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 78.19999694824219
+  },
+  {
+    "id": "A.COMIN2",
+    "bus": "A.COMP6#15",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 72.80000305175781
+  },
+  {
+    "id": "CHOO27GROUP.2",
+    "bus": "CHOO2P7#5",
+    "energy_source": "NUCLEAR",
+    "min_p": 291.0,
+    "max_p": 1500.0
+  },
+  {
+    "id": "POTEAIN2",
+    "bus": "POTEAP6#14",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 80.5999984741211
+  },
+  {
+    "id": "AMIENIN1",
+    "bus": "AMIENP6#18",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 23.600000381469727
+  },
+  {
+    "id": "CHOO17GROUP.1",
+    "bus": "CHOO1P7#5",
+    "energy_source": "NUCLEAR",
+    "min_p": 291.0,
+    "max_p": 1500.0
+  },
+  {
+    "id": "VICOGIN1",
+    "bus": "VICOGP6#6",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 32.29999923706055
+  },
+  {
+    "id": "H.VIEIN2",
+    "bus": "H.VIEP6#21",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 59.5
+  },
+  {
+    "id": "H.VIEIN1",
+    "bus": "H.VIEP6#21",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 69.19999694824219
+  },
+  {
+    "id": "H.VIEIN3",
+    "bus": "H.VIEP6#21",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 73.5
+  },
+  {
+    "id": "G.CAIIN1",
+    "bus": "G.CAIP6#29",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 24.600000381469727
+  },
+  {
+    "id": "GRAV57GRAV5T2",
+    "bus": "GRAV5P7#32",
+    "energy_source": "NUCLEAR",
+    "min_p": 180.0,
+    "max_p": 910.0
+  },
+  {
+    "id": "POTEAIN3",
+    "bus": "POTEAP6#18",
+    "energy_source": "WIND",
+    "min_p": 0.0,
+    "max_p": 79.80000305175781
+  }
+]

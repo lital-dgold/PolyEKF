@@ -1,0 +1,282 @@
+[
+  {
+    "id": "AVELIY761",
+    "kind": "twoWindingsTransformer",
+    "internal_bus": "AVELIP7#33",
+    "external_bus": "AVELIP6#35",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 1659.0,
+    "r_ohm": 0.5000000596046448,
+    "x_ohm": 39.29999923706055
+  },
+  {
+    "id": "AVELIY762",
+    "kind": "twoWindingsTransformer",
+    "internal_bus": "AVELIP7#33",
+    "external_bus": "AVELIP6#35",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 1659.0,
+    "r_ohm": 0.49000003933906555,
+    "x_ohm": 39.000003814697266
+  },
+  {
+    "id": "AVELIY763",
+    "kind": "twoWindingsTransformer",
+    "internal_bus": "AVELIP7#33",
+    "external_bus": "AVELIP6#35",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 1659.0,
+    "r_ohm": 0.49000003933906555,
+    "x_ohm": 39.000003814697266
+  },
+  {
+    "id": "ARGOEL71TERRI",
+    "kind": "line",
+    "internal_bus": "ARGOEP7#37",
+    "external_bus": "TERRIP7#35",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 3622.0,
+    "r_ohm": 1.6799999475479126,
+    "x_ohm": 22.110000610351562
+  },
+  {
+    "id": "ARGOEL72TERRI",
+    "kind": "line",
+    "internal_bus": "ARGOEP7#37",
+    "external_bus": "TERRIP7#35",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 3622.0,
+    "r_ohm": 1.679999828338623,
+    "x_ohm": 22.149999618530273
+  },
+  {
+    "id": "ARGOEL73TERRI",
+    "kind": "line",
+    "internal_bus": "ARGOEP7#37",
+    "external_bus": "TERRIP7#35",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 1794.0001220703125,
+    "r_ohm": 2.630000114440918,
+    "x_ohm": 25.799999237060547
+  },
+  {
+    "id": "MTCROL61VENDI",
+    "kind": "line",
+    "internal_bus": "MTCROP6#12",
+    "external_bus": "VENDIP6#29",
+    "nominal_v_internal_kv": 225.0,
+    "imax_amps": 1346.0,
+    "r_ohm": 0.25199997425079346,
+    "x_ohm": 1.7469998598098755
+  },
+  {
+    "id": "AVELIL61MASTA",
+    "kind": "line",
+    "internal_bus": "MASTAP6#27",
+    "external_bus": "AVELIP6#35",
+    "nominal_v_internal_kv": 225.0,
+    "imax_amps": 1346.0,
+    "r_ohm": 0.9279999732971191,
+    "x_ohm": 10.178999900817871
+  },
+  {
+    "id": "DECHYL61MASTA",
+    "kind": "line",
+    "internal_bus": "MASTAP6#27",
+    "external_bus": "DECHYP6#17",
+    "nominal_v_internal_kv": 225.0,
+    "imax_amps": 1030.0,
+    "r_ohm": 1.7050001621246338,
+    "x_ohm": 18.413997650146484
+  },
+  {
+    "id": "HOLQUL62ZRUMI",
+    "kind": "line",
+    "internal_bus": "ZRUMIP6#6",
+    "external_bus": "HOLQUP6#23",
+    "nominal_v_internal_kv": 225.0,
+    "imax_amps": 1078.0,
+    "r_ohm": 0.07999999821186066,
+    "x_ohm": 0.5600000023841858
+  },
+  {
+    "id": "TRIT5L61ZTRIT",
+    "kind": "line",
+    "internal_bus": "ZTRITP6#6",
+    "external_bus": "TRIT5P6#4",
+    "nominal_v_internal_kv": 225.0,
+    "imax_amps": 1082.0,
+    "r_ohm": 0.009999999776482582,
+    "x_ohm": 0.10000001639127731
+  },
+  {
+    "id": "TRITHL61ZTRIT",
+    "kind": "line",
+    "internal_bus": "ZTRITP6#6",
+    "external_bus": "TRITHP6#4",
+    "nominal_v_internal_kv": 225.0,
+    "imax_amps": 1082.0,
+    "r_ohm": 0.009999999776482582,
+    "x_ohm": 0.10000001639127731
+  },
+  {
+    "id": "LONNYL71MAZUR",
+    "kind": "line",
+    "internal_bus": "LONNYP7#35",
+    "external_bus": "MAZURP7#21",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 2400.0,
+    "r_ohm": 0.3199999928474426,
+    "x_ohm": 3.359999895095825
+  },
+  {
+    "id": "LONNYL71MOULA",
+    "kind": "line",
+    "internal_bus": "LONNYP7#35",
+    "external_bus": "MOULAP7#15",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 3622.0,
+    "r_ohm": 2.2599995136260986,
+    "x_ohm": 29.69999885559082
+  },
+  {
+    "id": "LONNYL72MAZUR",
+    "kind": "line",
+    "internal_bus": "LONNYP7#35",
+    "external_bus": "MAZURP7#21",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 2400.0,
+    "r_ohm": 0.3300000727176666,
+    "x_ohm": 3.3399999141693115
+  },
+  {
+    "id": "LONNYL72MOULA",
+    "kind": "line",
+    "internal_bus": "LONNYP7#35",
+    "external_bus": "MOULAP7#15",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 3622.0,
+    "r_ohm": 2.249999761581421,
+    "x_ohm": 29.699995040893555
+  },
+  {
+    "id": "LATENL71VLEVA",
+    "kind": "line",
+    "internal_bus": "LATENP7#23",
+    "external_bus": "VLEVAP7#27",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 2300.0,
+    "r_ohm": 3.059999704360962,
+    "x_ohm": 31.059995651245117
+  },
+  {
+    "id": "BARNAL71PENL5",
+    "kind": "line",
+    "internal_bus": "PENL5P7#27",
+    "external_bus": "BARNAP7#39",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 3622.0,
+    "r_ohm": 0.7099999785423279,
+    "x_ohm": 12.050000190734863
+  },
+  {
+    "id": "BARNAL72PENL5",
+    "kind": "line",
+    "internal_bus": "PENL5P7#27",
+    "external_bus": "BARNAP7#39",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 3622.0,
+    "r_ohm": 0.7099999785423279,
+    "x_ohm": 12.039999961853027
+  },
+  {
+    "id": "WARANY761",
+    "kind": "twoWindingsTransformer",
+    "internal_bus": "WARANP7#49",
+    "external_bus": "WARANP6#35",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 1659.0,
+    "r_ohm": 0.5,
+    "x_ohm": 38.400001525878906
+  },
+  {
+    "id": "WARANY762",
+    "kind": "twoWindingsTransformer",
+    "internal_bus": "WARANP7#49",
+    "external_bus": "WARANP6#35",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 1659.0,
+    "r_ohm": 0.4699999690055847,
+    "x_ohm": 38.29999923706055
+  },
+  {
+    "id": "WARANY763",
+    "kind": "twoWindingsTransformer",
+    "internal_bus": "WARANP7#49",
+    "external_bus": "WARANP6#35",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 1659.0,
+    "r_ohm": 0.4899999797344208,
+    "x_ohm": 38.20000076293945
+  },
+  {
+    "id": "F.FREL71M.SEI",
+    "kind": "line",
+    "internal_bus": "F.FREP7#11",
+    "external_bus": "M.SEIP7#41",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 2596.0,
+    "r_ohm": 0.4729999303817749,
+    "x_ohm": 5.063000202178955
+  },
+  {
+    "id": "HERS5L71VLEVA",
+    "kind": "line",
+    "internal_bus": "HERS5P7#10",
+    "external_bus": "VLEVAP7#27",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 2300.0,
+    "r_ohm": 1.8600001335144043,
+    "x_ohm": 18.81999969482422
+  },
+  {
+    "id": "WEPPEY761",
+    "kind": "twoWindingsTransformer",
+    "internal_bus": "WEPPEP7#11",
+    "external_bus": "WEPPEP6#25",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 1659.0,
+    "r_ohm": 0.5,
+    "x_ohm": 39.599998474121094
+  },
+  {
+    "id": "WEPPEY762",
+    "kind": "twoWindingsTransformer",
+    "internal_bus": "WEPPEP7#11",
+    "external_bus": "WEPPEP6#25",
+    "nominal_v_internal_kv": 380.0,
+    "imax_amps": 1659.0,
+    "r_ohm": 0.47999995946884155,
+    "x_ohm": 39.400001525878906
+  },
+  {
+    "id": "PERTAL61ZC.OM",
+    "kind": "line",
+    "internal_bus": "ZC.OMP6#6",
+    "external_bus": "PERTAP6#23",
+    "nominal_v_internal_kv": 225.0,
+    "imax_amps": 1346.0,
+    "r_ohm": 0.4809999465942383,
+    "x_ohm": 3.2039997577667236
+  },
+  {
+    "id": "CARRIL61MORU",
+    "kind": "line",
+    "internal_bus": "MORU P6#17",
+    "external_bus": "CARRIP6#31",
+    "nominal_v_internal_kv": 225.0,
+    "imax_amps": 1285.0,
+    "r_ohm": 1.7189997434616089,
+    "x_ohm": 11.456997871398926
+  }
+]

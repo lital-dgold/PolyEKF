@@ -126,8 +126,7 @@ def _run_dataset(ds_folder, sigma_v, sigma_w, sigma_x, thr):
     cfg_run["C_x_missmatch"] = (sigma_x ** 2) * np.eye(cfg_run["m"])
     cfg_run["thr1"]          = thr
 
-    # filt = METHOD_REGISTRY["gsp-ekf"](cfg_run)
-    filt = METHOD_REGISTRY["fast-ekf"](cfg_run)
+    filt = METHOD_REGISTRY[METHOD_TO_OPT](cfg_run)
     mse, *_ = one_method_evaluation(
         filt, va_mc, P_load_mc, pos_mc, updated_connections_mc, mse_threshold=1e2
     )
@@ -240,11 +239,10 @@ if __name__ == "__main__":
     for _var in ["OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"]:
         _os.environ[_var] = "1"
 
-    # dataset_dirs = sorted(glob.glob(DATASET_PATTERN))
-    # dataset_dirs = [d.replace("\\", "/") for d in dataset_dirs]
-    # if N_DATASETS_MAX is not None:
-    #     dataset_dirs = dataset_dirs[:N_DATASETS_MAX]
-    dataset_dirs = ["Power_data\\ieee57_dataset15","Power_data\\ieee57_dataset50","Power_data\\ieee57_dataset56",]
+    dataset_dirs = sorted(glob.glob(DATASET_PATTERN))
+    dataset_dirs = [d.replace("\\", "/") for d in dataset_dirs]
+    if N_DATASETS_MAX is not None:
+        dataset_dirs = dataset_dirs[:N_DATASETS_MAX]
     param_grid = list(itertools.product(SIGMA_V_GRID, SIGMA_W_GRID, SIGMA_X_GRID, THR_GRID))
     tasks = [(ds, sv, sw, sx, thr)
              for sv, sw, sx, thr in param_grid

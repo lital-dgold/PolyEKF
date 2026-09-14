@@ -455,6 +455,8 @@ class GRLSSimple:
         self.Q     = cov_init * np.eye(N2)  # (N²×N²) covariance
         self.q_vec = state_init    # (N²×1)  cross-correlation
 
+        self._eye_N = np.eye(N)
+
     # ------------------------------------------------------------------
     def __call__(self, q, y, *args, **kwargs) -> np.ndarray:
         """
@@ -472,12 +474,19 @@ class GRLSSimple:
         f_lag = q.reshape(-1, 1)    # f[k-M]
         f_k   = y.reshape(-1, 1)    # f[k]
 
-        # ── V_k = f[k-M]^T ⊗ I_N  →  shape (N, N²) ──────────────────
-        V_k = np.kron(f_lag.T, np.eye(self.N))
+        # V_k = f_lag^T ⊗ I_N is never needed explicitly. Both V_k.T @ V_k
+        # and V_k.T @ f_k have closed forms via Kronecker-product identities
+        # (exact, not approximate):
+        #   V_k.T @ V_k = kron(f_lag @ f_lag.T, I_N)
+        #   V_k.T @ f_k = kron(f_lag, f_k)
+        VtV = np.kron(f_lag @ f_lag.T, self._eye_N)
+        Vtf = np.kron(f_lag, f_k)
 
-        # ── RLS sufficient-statistic updates ──────────────────────────
-        self.Q     = self.beta * self.Q     + V_k.T @ V_k
-        self.q_vec = self.beta * self.q_vec + V_k.T @ f_k
+        # RLS sufficient-statistic updates (in-place)
+        self.Q *= self.beta
+        self.Q += VtV
+        self.q_vec *= self.beta
+        self.q_vec += Vtf
 
         # ── Gradient descent on r = vec(R) ────────────────────────────
         #   ∇J(r) = Q_K · r  −  q_K  +  λ_r · sign(r)

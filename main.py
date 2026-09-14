@@ -15,16 +15,17 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from util_func import (vector2diag, compute_metric_summary, pick_worker_count, plot_vs_parameter, mean_func, plot_metric,
                        one_method_evaluation, get_trajectory)
-from constants import METHOD_REGISTRY, LABELS, METHODS_ORDER
+from constants import METHOD_REGISTRY, LABELS, METHODS_ORDER, FOLDER_NONLINEAR_CASE1_VS_DEGREE_STD, \
+    FILE_NONLINEAR_CASE1_VS_DEGREE_STD_GRLS
 from constants import (cfg_linear, cfg_non_linear_case1, cfg_non_linear_case2, cfg_non_linear_vs_snr,
                        cfg_non_linear_vs_delta_n, cfg_non_linear_vs_k, cfg_non_linear_vs_sparsity,
-                       cfg_non_linear_vs_filter_order,
+                       cfg_non_linear_vs_filter_order, cfg_non_linear_case1_vs_degree_std,
                        cfg_linear_vs_thr, cfg_non_linear_case1_vs_thr, cfg_non_linear_case2_vs_thr)
 from constants import (RESULTS_DIR,
                        FILE_LINEAR_VS_TIME, FILE_NONLINEAR_CASE1_VS_TIME, FILE_NONLINEAR_CASE2_VS_TIME,
                        FILE_NONLINEAR_CASE2_VS_SNR, FILE_NONLINEAR_CASE2_VS_DELTA_N,
                        FILE_NONLINEAR_CASE2_VS_K, FILE_NONLINEAR_CASE2_VS_SPARSITY,
-                       FILE_N10_VS_POLY_ORDER,
+                       FILE_N10_VS_POLY_ORDER, FILE_NONLINEAR_CASE1_VS_DEGREE_STD,
                        FOLDER_PERFORMANCE_VS_THR, FILE_LINEAR_VS_THR,
                        FILE_NONLINEAR_CASE1_VS_THR, FILE_NONLINEAR_CASE2_VS_THR)
 
@@ -62,7 +63,8 @@ def single_monte_carlo(
     traj_t = cfg["trajectory_time"]
     pos, q_meas, y_meas, conn, stateInit = get_trajectory(
         traj_t, cfg["F"], cfg["B"],
-        cfg["C_w_sqrt"], cfg["C_u_sqrt"], cfg["n"], cfg["k"], cfg["poly_coefficients"], cfg["new_edge_weight"], cfg["num_edges_stateinit"], cfg["delta_n"]
+        cfg["C_w_sqrt"], cfg["C_u_sqrt"], cfg["n"], cfg["k"], cfg["poly_coefficients"], cfg["new_edge_weight"], cfg["num_edges_stateinit"], cfg["delta_n"],
+        degree_std=cfg.get("degree_std", 0)
     )
 
     # -----------------------------------------------------------------------
@@ -145,6 +147,18 @@ def _performance_vs_sparsity(num_edges, base_cfg, m, num_iterations, active_meth
     logging.info(f"sparsity={num_edges}%")  # this log is process-local
     return num_edges, run_monte_carlo_simulation(cfg, num_iterations, active_methods)
 
+def _performance_vs_degree_std(params, base_cfg, num_iterations, active_methods):
+    """
+    Runs one Monte-Carlo simulation for one (num_edges, degree_std) grid
+    point. Executed in poly_c separate process -> all arguments must be picklable.
+    """
+    num_edges, degree_std = params
+    cfg = copy.deepcopy(base_cfg)  # avoid concurrent mutation
+    cfg.update({"num_edges_stateinit": num_edges, "degree_std": degree_std})
+    logging.info(f"num_edges={num_edges}, degree_std={degree_std}")  # this log is process-local
+    return params, run_monte_carlo_simulation(cfg, num_iterations, active_methods)
+
+
 def _performance_vs_thr(thr, base_cfg, num_iterations, active_methods):
     cfg = copy.deepcopy(base_cfg)
     logging.info(f"thr={thr}")
@@ -201,11 +215,11 @@ if __name__ == "__main__":
     to_plot_non_linear_case_2_vs_sparsity = False
     to_plot_non_linear_case_2_vs_delta_n = False
     to_plot_non_linear_case_2_vs_k = False
-    # to_plot_non_linear_case_2_vs_change_sizes = False
     to_plot_n10_vs_poly_order = True
     to_plot_linear_vs_thr = False
     to_plot_non_linear_case1_vs_thr = False
     to_plot_non_linear_case2_vs_thr = False
+    to_plot_non_linear_case_vs_degree_ste = True
     #########################################################################
     #################### - Performance vs. time Linear case #################
     #########################################################################
@@ -478,5 +492,62 @@ if __name__ == "__main__":
                             FILE_NONLINEAR_CASE2_VS_THR, "nonlinear_case2_vs_thr")
         except FileNotFoundError:
             print(f"The file {FILE_NONLINEAR_CASE2_VS_THR} does not exist.")
+
+    #########################################################################
+    ###### - Performance vs. Sparsity and Degree STD Non-Linear case 1 ######
+    #########################################################################
+    if to_plot_non_linear_case_vs_degree_ste:
+        try:
+            cfg = cfg_non_linear_case1_vs_degree_std
+            num_edges_values = cfg["num_edges_values"]
+            degree_std_values = cfg["degree_std_values"]
+            with simulation("Non-Linear case - Performance vs. sparsity and degree std"):
+                grid = [(num_edges, degree_std) for degree_std in degree_std_values for num_edges in num_edges_values]
+                results_grid = {}  # {(num_edges, degree_std): runs}
+                max_workers = pick_worker_count()
+                logging.info(f"Performance vs. sparsity and degree std: {len(grid)} grid points "
+                            f"({len(num_edges_values)} num_edges x {len(degree_std_values)} degree_std), "
+                            f"{max_workers} workers")
+
+                with ProcessPoolExecutor(max_workers=max_workers) as exe:
+                    futures = {exe.submit(_performance_vs_degree_std, params, cfg,
+                                          cfg["num_iterations"], active_methods): params
+                               for params in grid}
+                    grid_start = time.perf_counter()
+                    for completed, fut in enumerate(as_completed(futures), start=1):
+                        params = futures[fut]
+                        _, result = fut.result()
+                        results_grid[params] = result
+                        elapsed = time.perf_counter() - grid_start
+                        logging.info(f"[{completed}/{len(grid)}] finished num_edges={params[0]}, "
+                                    f"degree_std={params[1]} (elapsed {elapsed:.1f}s)")
+
+            # Save
+            # os.makedirs(FOLDER_NONLINEAR_CASE1_VS_DEGREE_STD, exist_ok=True)
+            if (len(active_methods) == 1) and (active_methods[0] == "grls"):
+                save_file_name = FOLDER_NONLINEAR_CASE1_VS_DEGREE_STD
+            else:
+                save_file_name = FILE_NONLINEAR_CASE1_VS_DEGREE_STD_GRLS
+            with open(save_file_name, "wb") as f:
+                pickle.dump(results_grid, f)
+
+            # One curve set (vs. degree_std) per num_edges value, so each
+            # plot isolates the effect of degree std while sparsity is held
+            # fixed. x-axis position of each std band is its midpoint.
+            degree_std_midpoints = [(lo + hi) / 2 for lo, hi in degree_std_values]
+            for num_edges in num_edges_values:
+                runs_list = [results_grid[(num_edges, degree_std)] for degree_std in degree_std_values]
+                suffix = f"num_edges_{num_edges}"
+                plot_vs_parameter(degree_std_midpoints, runs_list, "mse",
+                                  aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER,
+                                  log_format=True, x_label1="Degree STD", to_save=True,
+                                  folder_name=data_folder_name, suffix=suffix)
+                plot_vs_parameter(degree_std_midpoints, runs_list, "eier",
+                                  aggregation_func=mean_func, labels=LABELS, methods_to_plot=METHODS_ORDER,
+                                  log_format=False, x_label1="Degree STD", to_save=True,
+                                  folder_name=data_folder_name, suffix=suffix)
+
+        except FileNotFoundError:
+            print(f"The file {FILE_NONLINEAR_CASE1_VS_DEGREE_STD} does not exist.")
 
     a = 5

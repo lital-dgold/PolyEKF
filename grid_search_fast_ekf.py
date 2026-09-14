@@ -1,8 +1,8 @@
 """
-grid_search_gsp_ekf.py
-----------------------
-Grid search over sigma_v (C_u), sigma_w (C_w), sigma_x_miss (C_x_missmatch),
-and thr1 (hard-threshold / "mu") for gsp-ekf (sparseKalmanFilter) on IEEE57 data.
+grid_search_fast_ekf.py
+------------------------
+Grid search over sigma_v (C_u), sigma_w (C_w), and sigma_x_miss (C_x_missmatch)
+for fast-ekf (FastExtendedKalmanFilter).
 
 Metrics per combo:
   avg_mse  — mean MSE across time steps and MC runs
@@ -124,8 +124,6 @@ def _run_dataset(ds_folder, sigma_v, sigma_w, sigma_x):
     cfg_run["C_w"]          = (sigma_w ** 2) * np.eye(cfg_run["n"])
     cfg_run["C_x_missmatch"] = (sigma_x ** 2) * np.eye(cfg_run["m"])
 
-
-    # filt = METHOD_REGISTRY["gsp-ekf"](cfg_run)
     filt = METHOD_REGISTRY["fast-ekf"](cfg_run)
     mse, *_ = one_method_evaluation(
         filt, va_mc, P_load_mc, pos_mc, updated_connections_mc, mse_threshold=1e2

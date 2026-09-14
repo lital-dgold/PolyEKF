@@ -1,0 +1,602 @@
+{
+  "MASTAP7#31": {
+    "vl": "MASTAP7",
+    "nominal_v": 380.0,
+    "substation": "MASTA",
+    "region": "LILLE"
+  },
+  "AVELIP7#33": {
+    "vl": "AVELIP7",
+    "nominal_v": 380.0,
+    "substation": "AVELI",
+    "region": "LILLE"
+  },
+  "POTEAP6#10": {
+    "vl": "POTEAP6",
+    "nominal_v": 225.0,
+    "substation": "POTEA",
+    "region": "LILLE"
+  },
+  "GRAV5P7#34": {
+    "vl": "GRAV5P7",
+    "nominal_v": 380.0,
+    "substation": "GRAV5",
+    "region": "LILLE"
+  },
+  "SEUILP7#11": {
+    "vl": "SEUILP7",
+    "nominal_v": 380.0,
+    "substation": "SEUIL",
+    "region": "LILLE"
+  },
+  "VEZILP6#12": {
+    "vl": "VEZILP6",
+    "nominal_v": 225.0,
+    "substation": "VEZIL",
+    "region": "LILLE"
+  },
+  "2LATEP7#6": {
+    "vl": "2LATEP7",
+    "nominal_v": 380.0,
+    "substation": "LATEN",
+    "region": "LILLE"
+  },
+  "FRUGEP7#7": {
+    "vl": "FRUGEP7",
+    "nominal_v": 380.0,
+    "substation": "FRUGE",
+    "region": "LILLE"
+  },
+  "ARGOEP7#37": {
+    "vl": "ARGOEP7",
+    "nominal_v": 380.0,
+    "substation": "ARGOE",
+    "region": "LILLE"
+  },
+  "AMARGP6#19": {
+    "vl": "AMARGP6",
+    "nominal_v": 225.0,
+    "substation": "AMARG",
+    "region": "LILLE"
+  },
+  "L.CHAP6#9": {
+    "vl": "L.CHAP6",
+    "nominal_v": 225.0,
+    "substation": "L.CHA",
+    "region": "LILLE"
+  },
+  "PENLYP7#15": {
+    "vl": "PENLYP7",
+    "nominal_v": 380.0,
+    "substation": "PENLY",
+    "region": "PARIS"
+  },
+  "COMPIP6#13": {
+    "vl": "COMPIP6",
+    "nominal_v": 225.0,
+    "substation": "COMPI",
+    "region": "PARIS"
+  },
+  "B.CO6P6#6": {
+    "vl": "B.CO6P6",
+    "nominal_v": 225.0,
+    "substation": "B.CO6",
+    "region": "LILLE"
+  },
+  "ZQUARP6#6": {
+    "vl": "ZQUARP6",
+    "nominal_v": 225.0,
+    "substation": "ZQUAR",
+    "region": "LILLE"
+  },
+  "C.OMEP6#6": {
+    "vl": "C.OMEP6",
+    "nominal_v": 225.0,
+    "substation": "C.OME",
+    "region": "LILLE"
+  },
+  "MANDAP6#19": {
+    "vl": "MANDAP6",
+    "nominal_v": 225.0,
+    "substation": "MANDA",
+    "region": "LILLE"
+  },
+  "VESLEP7#15": {
+    "vl": "VESLEP7",
+    "nominal_v": 380.0,
+    "substation": "VESLE",
+    "region": "LILLE"
+  },
+  "MTCROP6#12": {
+    "vl": "MTCROP6",
+    "nominal_v": 225.0,
+    "substation": "MTCRO",
+    "region": "LILLE"
+  },
+  "ZBXV6P6#6": {
+    "vl": "ZBXV6P6",
+    "nominal_v": 225.0,
+    "substation": "ZBXV6",
+    "region": "LILLE"
+  },
+  "MASTAP7#23": {
+    "vl": "MASTAP7",
+    "nominal_v": 380.0,
+    "substation": "MASTA",
+    "region": "LILLE"
+  },
+  "MASTAP6#27": {
+    "vl": "MASTAP6",
+    "nominal_v": 225.0,
+    "substation": "MASTA",
+    "region": "LILLE"
+  },
+  "NOGENP6#11": {
+    "vl": "NOGENP6",
+    "nominal_v": 225.0,
+    "substation": "NOGEN",
+    "region": "LILLE"
+  },
+  "THIERP6#9": {
+    "vl": "THIERP6",
+    "nominal_v": 225.0,
+    "substation": "THIER",
+    "region": "LILLE"
+  },
+  "BXTO5P6#29": {
+    "vl": "BXTO5P6",
+    "nominal_v": 225.0,
+    "substation": "BXTO5",
+    "region": "LILLE"
+  },
+  "ZARGOP6#6": {
+    "vl": "ZARGOP6",
+    "nominal_v": 225.0,
+    "substation": "ZARGO",
+    "region": "LILLE"
+  },
+  "3ARGOP7#6": {
+    "vl": "3ARGOP7",
+    "nominal_v": 380.0,
+    "substation": "ARGOE",
+    "region": "LILLE"
+  },
+  "ZRUMIP6#6": {
+    "vl": "ZRUMIP6",
+    "nominal_v": 225.0,
+    "substation": "ZRUMI",
+    "region": "LILLE"
+  },
+  "3LATEP7#6": {
+    "vl": "3LATEP7",
+    "nominal_v": 380.0,
+    "substation": "LATEN",
+    "region": "LILLE"
+  },
+  "RUPREP6#3": {
+    "vl": "RUPREP6",
+    "nominal_v": 225.0,
+    "substation": "RUPRE",
+    "region": "LILLE"
+  },
+  "1ARGOP7#6": {
+    "vl": "1ARGOP7",
+    "nominal_v": 380.0,
+    "substation": "ARGOE",
+    "region": "LILLE"
+  },
+  "CUPERP6#10": {
+    "vl": "CUPERP6",
+    "nominal_v": 225.0,
+    "substation": "CUPER",
+    "region": "LILLE"
+  },
+  "GRAV5P7#36": {
+    "vl": "GRAV5P7",
+    "nominal_v": 380.0,
+    "substation": "GRAV5",
+    "region": "LILLE"
+  },
+  "P.SAMP6#22": {
+    "vl": "P.SAMP6",
+    "nominal_v": 225.0,
+    "substation": "P.SAM",
+    "region": "LILLE"
+  },
+  "ARGOEP6#26": {
+    "vl": "ARGOEP6",
+    "nominal_v": 225.0,
+    "substation": "ARGOE",
+    "region": "LILLE"
+  },
+  "SSBR5P6#13": {
+    "vl": "SSBR5P6",
+    "nominal_v": 225.0,
+    "substation": "SSBR5",
+    "region": "LILLE"
+  },
+  "B.CO5P6#4": {
+    "vl": "B.CO5P6",
+    "nominal_v": 225.0,
+    "substation": "B.CO5",
+    "region": "LILLE"
+  },
+  "GRAV5P7#38": {
+    "vl": "GRAV5P7",
+    "nominal_v": 380.0,
+    "substation": "GRAV5",
+    "region": "LILLE"
+  },
+  "ORMESP6#31": {
+    "vl": "ORMESP6",
+    "nominal_v": 225.0,
+    "substation": "ORMES",
+    "region": "LILLE"
+  },
+  "ZTRITP6#6": {
+    "vl": "ZTRITP6",
+    "nominal_v": 225.0,
+    "substation": "ZTRIT",
+    "region": "LILLE"
+  },
+  "BLOCAP6#23": {
+    "vl": "BLOCAP6",
+    "nominal_v": 225.0,
+    "substation": "BLOCA",
+    "region": "LILLE"
+  },
+  "CAPELP7#9": {
+    "vl": "CAPELP7",
+    "nominal_v": 380.0,
+    "substation": "CAPEL",
+    "region": "LILLE"
+  },
+  "CHEVAP7#23": {
+    "vl": "CHEVAP7",
+    "nominal_v": 380.0,
+    "substation": "CHEVA",
+    "region": "LILLE"
+  },
+  "BOUCHP7#5": {
+    "vl": "BOUCHP7",
+    "nominal_v": 380.0,
+    "substation": "BOUCH",
+    "region": "LILLE"
+  },
+  "QUAREP6#10": {
+    "vl": "QUAREP6",
+    "nominal_v": 225.0,
+    "substation": "QUARE",
+    "region": "LILLE"
+  },
+  "ECHINP6#15": {
+    "vl": "ECHINP6",
+    "nominal_v": 225.0,
+    "substation": "ECHIN",
+    "region": "LILLE"
+  },
+  "LIMEUP6#5": {
+    "vl": "LIMEUP6",
+    "nominal_v": 225.0,
+    "substation": "LIMEU",
+    "region": "LILLE"
+  },
+  "A.COMP6#15": {
+    "vl": "A.COMP6",
+    "nominal_v": 225.0,
+    "substation": "A.COM",
+    "region": "LILLE"
+  },
+  "LONNYP7#35": {
+    "vl": "LONNYP7",
+    "nominal_v": 380.0,
+    "substation": "LONNY",
+    "region": "LILLE"
+  },
+  "CHOO2P7#5": {
+    "vl": "CHOO2P7",
+    "nominal_v": 380.0,
+    "substation": "CHOO2",
+    "region": "LILLE"
+  },
+  "POTEAP6#14": {
+    "vl": "POTEAP6",
+    "nominal_v": 225.0,
+    "substation": "POTEA",
+    "region": "LILLE"
+  },
+  "AMIENP6#18": {
+    "vl": "AMIENP6",
+    "nominal_v": 225.0,
+    "substation": "AMIEN",
+    "region": "LILLE"
+  },
+  "CHOO1P7#5": {
+    "vl": "CHOO1P7",
+    "nominal_v": 380.0,
+    "substation": "CHOO1",
+    "region": "LILLE"
+  },
+  "VICOGP6#6": {
+    "vl": "VICOGP6",
+    "nominal_v": 225.0,
+    "substation": "VICOG",
+    "region": "LILLE"
+  },
+  "SORRUP6#13": {
+    "vl": "SORRUP6",
+    "nominal_v": 225.0,
+    "substation": "SORRU",
+    "region": "LILLE"
+  },
+  "ABLAIP6#9": {
+    "vl": "ABLAIP6",
+    "nominal_v": 225.0,
+    "substation": "ABLAI",
+    "region": "LILLE"
+  },
+  "ATTAQP7#13": {
+    "vl": "ATTAQP7",
+    "nominal_v": 380.0,
+    "substation": "ATTAQ",
+    "region": "LILLE"
+  },
+  "LATENP6#31": {
+    "vl": "LATENP6",
+    "nominal_v": 225.0,
+    "substation": "LATEN",
+    "region": "LILLE"
+  },
+  "PEUP5P7#2": {
+    "vl": "PEUP5P7",
+    "nominal_v": 380.0,
+    "substation": "PEUP5",
+    "region": "LILLE"
+  },
+  "PERIZP6#17": {
+    "vl": "PERIZP6",
+    "nominal_v": 225.0,
+    "substation": "PERIZ",
+    "region": "LILLE"
+  },
+  "H.VIEP6#21": {
+    "vl": "H.VIEP6",
+    "nominal_v": 225.0,
+    "substation": "H.VIE",
+    "region": "LILLE"
+  },
+  "LATENP7#23": {
+    "vl": "LATENP7",
+    "nominal_v": 380.0,
+    "substation": "LATEN",
+    "region": "LILLE"
+  },
+  "TUNNEP6#18": {
+    "vl": "TUNNEP6",
+    "nominal_v": 225.0,
+    "substation": "TUNNE",
+    "region": "LILLE"
+  },
+  "MANDAP6#23": {
+    "vl": "MANDAP6",
+    "nominal_v": 225.0,
+    "substation": "MANDA",
+    "region": "LILLE"
+  },
+  "GAVREP7#19": {
+    "vl": "GAVREP7",
+    "nominal_v": 380.0,
+    "substation": "GAVRE",
+    "region": "LILLE"
+  },
+  "PENL5P7#27": {
+    "vl": "PENL5P7",
+    "nominal_v": 380.0,
+    "substation": "PENL5",
+    "region": "PARIS"
+  },
+  "SETIEP6#11": {
+    "vl": "SETIEP6",
+    "nominal_v": 225.0,
+    "substation": "SETIE",
+    "region": "LILLE"
+  },
+  "TUNNEP6#16": {
+    "vl": "TUNNEP6",
+    "nominal_v": 225.0,
+    "substation": "TUNNE",
+    "region": "LILLE"
+  },
+  "WARANP7#49": {
+    "vl": "WARANP7",
+    "nominal_v": 380.0,
+    "substation": "WARAN",
+    "region": "LILLE"
+  },
+  "ZCP.M66#6": {
+    "vl": "ZCP.M66",
+    "nominal_v": 225.0,
+    "substation": "ZCP.M",
+    "region": "LILLE"
+  },
+  "CXSSEP6#19": {
+    "vl": "CXSSEP6",
+    "nominal_v": 225.0,
+    "substation": "CXSSE",
+    "region": "LILLE"
+  },
+  "ESTR6P6#13": {
+    "vl": "ESTR6P6",
+    "nominal_v": 225.0,
+    "substation": "ESTR6",
+    "region": "LILLE"
+  },
+  "ZCUPEP6#6": {
+    "vl": "ZCUPEP6",
+    "nominal_v": 225.0,
+    "substation": "ZCUPE",
+    "region": "LILLE"
+  },
+  "F.FREP7#11": {
+    "vl": "F.FREP7",
+    "nominal_v": 380.0,
+    "substation": "F.FRE",
+    "region": "NANCY"
+  },
+  "HERS5P7#10": {
+    "vl": "HERS5P7",
+    "nominal_v": 380.0,
+    "substation": "HERS5",
+    "region": "PARIS"
+  },
+  "VALENP6#21": {
+    "vl": "VALENP6",
+    "nominal_v": 225.0,
+    "substation": "VALEN",
+    "region": "LILLE"
+  },
+  "CERNAP6#13": {
+    "vl": "CERNAP6",
+    "nominal_v": 225.0,
+    "substation": "CERNA",
+    "region": "LILLE"
+  },
+  "TUNNEP6#14": {
+    "vl": "TUNNEP6",
+    "nominal_v": 225.0,
+    "substation": "TUNNE",
+    "region": "LILLE"
+  },
+  "MANDAP7#45": {
+    "vl": "MANDAP7",
+    "nominal_v": 380.0,
+    "substation": "MANDA",
+    "region": "LILLE"
+  },
+  "MAUBEP6#19": {
+    "vl": "MAUBEP6",
+    "nominal_v": 225.0,
+    "substation": "MAUBE",
+    "region": "LILLE"
+  },
+  "WEPPEP7#11": {
+    "vl": "WEPPEP7",
+    "nominal_v": 380.0,
+    "substation": "WEPPE",
+    "region": "LILLE"
+  },
+  "1LIME77#6": {
+    "vl": "1LIME77",
+    "nominal_v": 380.0,
+    "substation": "LIMEU",
+    "region": "LILLE"
+  },
+  "BUIREP6#7": {
+    "vl": "BUIREP6",
+    "nominal_v": 225.0,
+    "substation": "BUIRE",
+    "region": "LILLE"
+  },
+  "ATTAQP6#19": {
+    "vl": "ATTAQP6",
+    "nominal_v": 225.0,
+    "substation": "ATTAQ",
+    "region": "LILLE"
+  },
+  "DAMERP6#10": {
+    "vl": "DAMERP6",
+    "nominal_v": 225.0,
+    "substation": "DAMER",
+    "region": "LILLE"
+  },
+  "BXCH5P6#8": {
+    "vl": "BXCH5P6",
+    "nominal_v": 225.0,
+    "substation": "BXCH5",
+    "region": "LILLE"
+  },
+  "MOIMOP6#14": {
+    "vl": "MOIMOP6",
+    "nominal_v": 225.0,
+    "substation": "MOIMO",
+    "region": "PARIS"
+  },
+  "AULNOP6#8": {
+    "vl": "AULNOP6",
+    "nominal_v": 225.0,
+    "substation": "AULNO",
+    "region": "LILLE"
+  },
+  "LIMEUP7#9": {
+    "vl": "LIMEUP7",
+    "nominal_v": 380.0,
+    "substation": "LIMEU",
+    "region": "LILLE"
+  },
+  "S.DAMP6#9": {
+    "vl": "S.DAMP6",
+    "nominal_v": 225.0,
+    "substation": "S.DAM",
+    "region": "LILLE"
+  },
+  "G.CAIP6#29": {
+    "vl": "G.CAIP6",
+    "nominal_v": 225.0,
+    "substation": "G.CAI",
+    "region": "LILLE"
+  },
+  "ZC.OMP6#6": {
+    "vl": "ZC.OMP6",
+    "nominal_v": 225.0,
+    "substation": "ZC.OM",
+    "region": "LILLE"
+  },
+  "RECY P6#11": {
+    "vl": "RECY P6",
+    "nominal_v": 225.0,
+    "substation": "RECY",
+    "region": "LILLE"
+  },
+  "ZRUPRP6#6": {
+    "vl": "ZRUPRP6",
+    "nominal_v": 225.0,
+    "substation": "ZRUPR",
+    "region": "LILLE"
+  },
+  "GRAV5P7#32": {
+    "vl": "GRAV5P7",
+    "nominal_v": 380.0,
+    "substation": "GRAV5",
+    "region": "LILLE"
+  },
+  "FAMARP6#9": {
+    "vl": "FAMARP6",
+    "nominal_v": 225.0,
+    "substation": "FAMAR",
+    "region": "LILLE"
+  },
+  "CAPELP6#15": {
+    "vl": "CAPELP6",
+    "nominal_v": 225.0,
+    "substation": "CAPEL",
+    "region": "LILLE"
+  },
+  "MORU P6#17": {
+    "vl": "MORU P6",
+    "nominal_v": 225.0,
+    "substation": "MORU",
+    "region": "PARIS"
+  },
+  "VESLEP6#21": {
+    "vl": "VESLEP6",
+    "nominal_v": 225.0,
+    "substation": "VESLE",
+    "region": "LILLE"
+  },
+  "POTEAP6#18": {
+    "vl": "POTEAP6",
+    "nominal_v": 225.0,
+    "substation": "POTEA",
+    "region": "LILLE"
+  }
+}
